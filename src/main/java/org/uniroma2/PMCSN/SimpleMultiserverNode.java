@@ -2,9 +2,10 @@ package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
 
+
 import static org.uniroma2.PMCSN.Libs.Distributions.*;
 
-public class SimpleMultiserverNode {
+public class SimpleMultiserverNode implements Node{
 
     private static final int ARRIVAL = 0;
     private int SERVERS;
@@ -168,6 +169,13 @@ public class SimpleMultiserverNode {
 
     public long getProcessedJobs() {
         return index;
+    }
+
+    public void generateNewFeedbackArrival(){
+        // ARRIVAL “esterno” o da routing
+        number++;
+        // programma il prossimo ARRIVAL esterno
+        event[ARRIVAL].t = getNextArrivalTime();
     }
 
 }

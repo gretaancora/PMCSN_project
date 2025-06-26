@@ -2,9 +2,29 @@ package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
 
-public class RideSharingMultiserverNode extends SimpleMultiserverNode {
+import static org.uniroma2.PMCSN.Libs.Distributions.*;
+import static org.uniroma2.PMCSN.Libs.Distributions.idfNormal;
+import static org.uniroma2.PMCSN.RideSharingSystem.generateFeedback;
 
+public class RideSharingMultiserverNode implements Node{
+
+    private static final int ARRIVAL = 0;
+    private int SERVERS;
+    private double sarrival;    // orario cumulato per gli arrivi
     private MsqEvent[] event;   // event[0]=next arrival, [1..S]=server departures
+    private MsqSum[] sum;       // statistiche per ogni server
+    private long number;        // job totali nel nodo (in servizio + in coda)
+    private long index;         // contatore job processati
+    private double area;        // integrale del numero in sistema
+    private double currentTime;
+    private Rngs r;
+    private static double P_EXIT = 0.05;
+    private static double RETURN0 = 0.15;
+    private static double RETURN1 = 0.15;
+    private static double RETURN2 = 0.15;
+    private static double DELAY = 5;
+
+
 
     public RideSharingMultiserverNode(int servers, Rngs rng) {
         super(servers, rng);
@@ -20,5 +40,129 @@ public class RideSharingMultiserverNode extends SimpleMultiserverNode {
         }
 
         return s;
+    }
+
+    @Override
+    public void generateNewFeedbackArrival() {
+        //non utilizzato in questo tipo di centro
+    }
+
+
+    // Avanza la simulazione di questo nodo fino all'evento scelto
+    // e restituisce eventuale DEPARTURE schedulato (server index), oppure -1.
+    public int processNextEvent(double t) {
+        int e = peekNextEventType();
+        double tnext = event[e].t;
+        // integrazione area
+        area += (tnext - currentTime) * number;
+        currentTime = tnext;
+
+        if (e == ARRIVAL) {
+            // ARRIVAL “esterno” o da routing
+            number++;
+            // programma il prossimo ARRIVAL esterno
+            event[ARRIVAL].t = getNextArrivalTime();
+            double pLoss = r.random();
+            if (pLoss < P_EXIT) {
+                number--;
+            } else if (pLoss < RETURN0+P_EXIT) {
+                generateFeedback(0);
+            } else if (pLoss < RETURN1+RETURN0+P_EXIT) {
+                generateFeedback(1);
+            } else if (pLoss < RETURN2+RETURN1+RETURN0+P_EXIT) {
+                generateFeedback(2);
+            } else {
+                // se server disponibile, avvia subito il servizio
+                if (number <= SERVERS) {
+                    double svc = getServiceTime();
+                    int srv = findOne();
+                    event[srv].t = currentTime + svc;
+                    event[srv].x = 1;
+                    sum[srv].service += svc;
+                    sum[srv].served++;
+                    return srv;
+                }
+            }
+
+        } else {
+            // DEPARTURE da server e = srv
+            index++;
+            number--;
+            // coda non vuota?
+            if (number >= SERVERS) {
+                double svc = getServiceTime();
+                event[e].t = currentTime + svc;
+                sum[e].service += svc;
+                sum[e].served++;
+                return e;
+            } else {
+                event[e].x = 0;
+            }
+        }
+
+        return -1;
+    }
+
+    // Espone il prossimo evento attivo
+    public double peekNextEventTime() {
+        double tmin = Double.POSITIVE_INFINITY;
+        for (int i = 0; i <= SERVERS; i++)
+            if (event[i].x == 1 && event[i].t < tmin)
+                tmin = event[i].t;
+        return tmin;
+    }
+
+    public int peekNextEventType() {
+        int best = -1;
+        double tmin = Double.POSITIVE_INFINITY;
+        for (int i = 0; i <= SERVERS; i++)
+            if (event[i].x == 1 && event[i].t < tmin) {
+                tmin = event[i].t;
+                best = i;
+            }
+        return best;
+    }
+
+    public double getNextArrivalTime() {
+        r.selectStream(0);
+        sarrival += exponential(2.0, r);
+        return sarrival;
+    }
+
+    //dovrebbe restituire valore gaussiana troncata tra a e b
+    public double getServiceTime() {
+        r.selectStream(1);
+        //return uniform(2.0, 10.0, r);
+        double alpha, beta;
+        double a = 1;
+        double b = 60;
+
+        alpha = cdfNormal(1.5, 2.0, a);
+        beta = cdfNormal(1.5, 2.0, b);
+
+        double u = uniform(alpha, 1.0-beta, r);
+        return (idfNormal(1.5, 2.0, u)+DELAY);
+    }
+
+
+    // Metodi per statistiche a fine run
+    public double getAvgInterArrival() {
+        return event[ARRIVAL].t / index;
+    }
+
+    public double getAvgWait() {
+        return area / index;
+    }
+
+    public double getAvgNumInNode() {
+        return area / currentTime;
+    }
+
+    public double getCurrentTime() {
+        return currentTime;
+    }
+
+    public long getProcessedJobs() {
+        return index;
     }
 }

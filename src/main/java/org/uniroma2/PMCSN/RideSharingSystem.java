@@ -2,6 +2,9 @@ package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class RideSharingSystem implements Sistema {
     // Numero di centri semplici nel sistema
     private static final int SIMPLE_CENTERS = 3;
@@ -15,60 +18,78 @@ public class RideSharingSystem implements Sistema {
     private static final int SERVERS_SIMPLE = 2;
     // Numero di server per il RideSharingMultiserverNode
     private static final int SERVERS_RIDE = 4;
+    private Rngs rng;
+    private static List<Node> nodes = new ArrayList<>(4);
+
+    public RideSharingSystem(){
+
+        rng = new Rngs();
+
+        for (int i = 0; i < SIMPLE_CENTERS; i++) {
+            SimpleMultiserverNode center = new SimpleMultiserverNode(SERVERS_SIMPLE, rng);
+            nodes.add(center);
+        }
+
+        // Esegui il centro ride-sharing
+        for (int j = 0; j < RIDE_CENTERS; j++) {
+            RideSharingMultiserverNode rideNode = new RideSharingMultiserverNode(SERVERS_RIDE, rng);
+            nodes.add(rideNode);
+        }
+    }
 
     @Override
     public void runFiniteSimulation() {
-        double totalProcessedSimple = 0.0;
-        double totalWaitingSimple = 0.0;
-        double totalProcessedRide = 0.0;
-        double totalWaitingRide = 0.0;
+        double totalProcessed = 0.0;
+        double totalWaiting = 0.0;
 
         for (int rep = 0; rep < REPLICAS; rep++) {
             // Inizializza generatore RNG per ogni replica
-            Rngs rng = new Rngs();
+             rng = new Rngs();
             rng.plantSeeds(rep + 1);
 
-            // Esegui i centri semplici
-            for (int i = 0; i < SIMPLE_CENTERS; i++) {
-                SimpleMultiserverNode center = new SimpleMultiserverNode(SERVERS_SIMPLE, rng);
-                while (center.peekNextEventTime() < STOP) {
-                    double tNext = center.peekNextEventTime();
-                    center.processNextEvent(tNext);
+            while (true) {
+                int j=0;
+                double tmin = Double.MAX_VALUE;
+                double tcurr;
+
+                // Prendo centro con prossimo evento con time minore
+                for (int i = 0; i < 4; i++) {
+                    tcurr = nodes.get(i).peekNextEventTime();
+                    if (tcurr < tmin) {
+                        tmin = tcurr;
+                        j=i;
+                    }
                 }
-                totalProcessedSimple += center.getProcessedJobs();
-                totalWaitingSimple += center.getAvgWait();
+
+                if (tmin > STOP) break;
+
+                nodes.get(j).processNextEvent(tmin);
+                // Raccogli statistiche
+                totalProcessed += nodes.get(j).getProcessedJobs();
+                totalWaiting += nodes.get(j).getAvgWait();
             }
 
-            // Esegui il centro ride-sharing
-            for (int j = 0; j < RIDE_CENTERS; j++) {
-                RideSharingMultiserverNode rideNode = new RideSharingMultiserverNode(SERVERS_RIDE, rng);
-                while (rideNode.peekNextEventTime() < STOP) {
-                    double tNext = rideNode.peekNextEventTime();
-                    rideNode.processNextEvent(tNext);
-                }
-                totalProcessedRide += rideNode.getProcessedJobs();
-                totalWaitingRide += rideNode.getAvgWait();
-            }
         }
 
         // Calcola medie
-        double avgProcessedSimple = totalProcessedSimple / (REPLICAS * SIMPLE_CENTERS);
-        double avgWaitingSimple = totalWaitingSimple / (REPLICAS * SIMPLE_CENTERS);
-        double avgProcessedRide = totalProcessedRide / (REPLICAS * RIDE_CENTERS);
-        double avgWaitingRide = totalWaitingRide / (REPLICAS * RIDE_CENTERS);
+        double avgProcessed = totalProcessed / (REPLICAS * SIMPLE_CENTERS);
+        double avgWaiting = totalWaiting / (REPLICAS * RIDE_CENTERS);
 
         // Stampa risultati
         System.out.println("=== RideSharingSystem (Finite Simulation) ===");
         System.out.printf("Repliche: %d%n", REPLICAS);
         System.out.printf("Simple Centers: %d, Ride-Sharing Centers: %d%n", SIMPLE_CENTERS, RIDE_CENTERS);
-        System.out.printf("Avg. processed jobs per simple center: %.2f%n", avgProcessedSimple);
-        System.out.printf("Avg. wait time per simple center:    %.2f%n", avgWaitingSimple);
-        System.out.printf("Avg. processed jobs per ride center:   %.2f%n", avgProcessedRide);
-        System.out.printf("Avg. wait time per ride center:      %.2f%n", avgWaitingRide);
+        System.out.printf("Avg. processed jobs per simple center: %.2f%n", avgProcessed);
+        System.out.printf("Avg. wait time per simple center:    %.2f%n", avgWaiting);
     }
 
     @Override
     public void runInfiniteSimulation() {
         throw new UnsupportedOperationException("Infinite simulation not implemented for RideSharingSystem");
+    }
+
+
+    public static void generateFeedback(int i){
+        nodes.get(i).generateNewFeedbackArrival();
     }
 }
