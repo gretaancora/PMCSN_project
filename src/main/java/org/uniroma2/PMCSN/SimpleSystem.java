@@ -10,7 +10,11 @@ public class SimpleSystem implements Sistema{
     // Tempo di stop della simulazione (orizzonte finito)
     private static final double STOP = 20000.0;
     // Numero di server configurati per ciascun nodo
-    private static final int SERVERS = 2;
+    public static final Integer[] SERVERS = {
+            2,
+            2,
+            2
+    };
 
     @Override
     public void runFiniteSimulation() {
@@ -25,7 +29,7 @@ public class SimpleSystem implements Sistema{
 
             for (int i = 0; i < NODES; i++) {
                 // Crea il nodo multiserver con SERVERS server
-                SimpleMultiserverNode node = new SimpleMultiserverNode(SERVERS, rng);
+                SimpleMultiserverNode node = new SimpleMultiserverNode(SERVERS[i], rng);
                 // Esegui eventi finché il prossimo evento è prima di STOP
                 while ((tnext = node.peekNextEventTime()) < STOP) {
                     node.processNextEvent(tnext);

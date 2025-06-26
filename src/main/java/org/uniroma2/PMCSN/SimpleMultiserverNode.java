@@ -16,6 +16,7 @@ public class SimpleMultiserverNode {
     private double area;        // integrale del numero in sistema
     private double currentTime;
     private Rngs r;
+    private static double P_EXIT = 0.05;
 
     public SimpleMultiserverNode(int servers, Rngs rng) {
         this.SERVERS = servers;
@@ -78,15 +79,20 @@ public class SimpleMultiserverNode {
             number++;
             // programma il prossimo ARRIVAL esterno
             event[ARRIVAL].t = getNextArrivalTime();
-            // se server disponibile, avvia subito il servizio
-            if (number <= SERVERS) {
-                double svc = getServiceTime();
-                int srv = findOne();
-                event[srv].t = currentTime + svc;
-                event[srv].x = 1;
-                sum[srv].service += svc;
-                sum[srv].served++;
-                return srv;
+            double pLoss = r.random();
+            if (pLoss < P_EXIT) {
+                number--;
+            } else {
+                // se server disponibile, avvia subito il servizio
+                if (number <= SERVERS) {
+                    double svc = getServiceTime();
+                    int srv = findOne();
+                    event[srv].t = currentTime + svc;
+                    event[srv].x = 1;
+                    sum[srv].service += svc;
+                    sum[srv].served++;
+                    return srv;
+                }
             }
 
         } else {
@@ -108,16 +114,29 @@ public class SimpleMultiserverNode {
         return -1;
     }
 
+
+
     public double getNextArrivalTime() {
         r.selectStream(0);
         sarrival += exponential(2.0, r);
         return sarrival;
     }
 
+    //dovrebbe restituire valore gaussiana troncata tra a e b
     public double getServiceTime() {
         r.selectStream(1);
-        return uniform(2.0, 10.0, r);
+        //return uniform(2.0, 10.0, r);
+        double alpha, beta;
+        double a = 1;
+        double b = 60;
+
+        alpha = cdfNormal(1.5, 2.0, a);
+        beta = cdfNormal(1.5, 2.0, b);
+
+        double u = uniform(alpha, 1.0-beta, r);
+        return idfNormal(1.5, 2.0, u);
     }
+
 
     public int findOne() {
         int s=1; //in 0 abbiamo arrivo
@@ -128,6 +147,7 @@ public class SimpleMultiserverNode {
 
         return s;
     }
+
 
     // Metodi per statistiche a fine run
     public double getAvgInterArrival() {
