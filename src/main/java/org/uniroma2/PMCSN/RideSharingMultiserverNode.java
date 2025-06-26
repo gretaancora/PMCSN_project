@@ -27,10 +27,32 @@ public class RideSharingMultiserverNode implements Node{
 
 
     public RideSharingMultiserverNode(int servers, Rngs rng) {
-        super(servers, rng);
+        this.SERVERS = servers;
+        this.r = rng;
+        this.sarrival = 0.0;
+        this.currentTime = 0.0;
+        this.number = 0;
+        this.index = 0;
+        this.area = 0.0;
+
+        // eventi e somme
+        event = new MsqEvent[servers + 1];
+        sum = new MsqSum[servers + 1];
+
+
+        for (int i = 0; i <= servers; i++) {
+            event[i] = new MsqEvent();
+            sum[i] = new MsqSum();
+            event[i].x = 0;
+            sum[i].service = 0.0;
+            sum[i].served = 0;
+        }
+
+        // schedulo il primo arrivo “esterno”
+        event[ARRIVAL].t = getNextArrivalTime();
+        event[ARRIVAL].x = 1;
     }
 
-    @Override
     // trova server libero
     public int findOne() {
         int s=1; //in 0 abbiamo arrivo
