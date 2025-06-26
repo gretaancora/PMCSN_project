@@ -2,6 +2,9 @@ package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.uniroma2.PMCSN.Libs.Distributions.*;
 import static org.uniroma2.PMCSN.Libs.Distributions.idfNormal;
 import static org.uniroma2.PMCSN.RideSharingSystem.generateFeedback;
@@ -19,11 +22,13 @@ public class RideSharingMultiserverNode implements Node{
     private double currentTime;
     private Rngs r;
     private static double P_EXIT = 0.05;
-    private static double RETURN0 = 0.15;
-    private static double RETURN1 = 0.15;
-    private static double RETURN2 = 0.15;
+    private static double FEEDBACK = 0.15;
     private static double DELAY = 5;
+    private static double TIME_WINDOW = 5;
+    private static double SERVER_SMALL = 5;
+    private static double SERVER_MEDIUM = 5;
 
+    private static List<MsqEvent> pendingArrivals = new ArrayList<MsqEvent>();
 
 
     public RideSharingMultiserverNode(int servers, Rngs rng) {
@@ -42,6 +47,15 @@ public class RideSharingMultiserverNode implements Node{
 
         for (int i = 0; i <= servers; i++) {
             event[i] = new MsqEvent();
+            if (i>0) {
+                if (i < SERVER_SMALL) {
+                    event[i].capacità = 3;
+                } else if (i < SERVER_SMALL + SERVER_MEDIUM) {
+                    event[i].capacità = 4;
+                } else {
+                    event[i].capacità = 8;
+                }
+            }
             sum[i] = new MsqSum();
             event[i].x = 0;
             sum[i].service = 0.0;
@@ -54,14 +68,13 @@ public class RideSharingMultiserverNode implements Node{
     }
 
     // trova server libero
+    //chi rimane fuori rimane nella coda pending e mettiamo in event[0]
     public int findOne() {
-        int s=1; //in 0 abbiamo arrivo
+       int i=0;
+        while (i<pendingArrivals.size()){
+            match
+       }
 
-        while (true){
-            if (event[s++].x == 0) break;  //trova il primo libero
-        }
-
-        return s;
     }
 
     @Override
@@ -87,23 +100,18 @@ public class RideSharingMultiserverNode implements Node{
             double pLoss = r.random();
             if (pLoss < P_EXIT) {
                 number--;
-            } else if (pLoss < RETURN0+P_EXIT) {
-                generateFeedback(0);
-            } else if (pLoss < RETURN1+RETURN0+P_EXIT) {
-                generateFeedback(1);
-            } else if (pLoss < RETURN2+RETURN1+RETURN0+P_EXIT) {
-                generateFeedback(2);
+            } else if (pLoss < FEEDBACK) {
+                generateFeedback(event[ARRIVAL]);
             } else {
-                // se server disponibile, avvia subito il servizio
-                if (number <= SERVERS) {
-                    double svc = getServiceTime();
-                    int srv = findOne();
-                    event[srv].t = currentTime + svc;
-                    event[srv].x = 1;
-                    sum[srv].service += svc;
-                    sum[srv].served++;
-                    return srv;
+                int i=0;
+                while(true){
+                    pendingArrivals.add(i, new MsqEvent());
+                    pendingArrivals.get(i).t = getNextArrivalTime();
+                    pendingArrivals.get(i).x = 1;
+                    if(pendingArrivals.get(i).t > currentTime + TIME_WINDOW) break;
+                    i++;
                 }
+                findOne();
             }
 
         } else {
