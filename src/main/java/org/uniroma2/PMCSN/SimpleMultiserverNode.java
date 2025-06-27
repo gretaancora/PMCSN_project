@@ -1,8 +1,6 @@
 package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
-
-
 import static org.uniroma2.PMCSN.Libs.Distributions.*;
 
 public class SimpleMultiserverNode implements Node{
@@ -10,8 +8,18 @@ public class SimpleMultiserverNode implements Node{
     private static final int ARRIVAL = 0;
     private int SERVERS;
     private double sarrival;    // orario cumulato per gli arrivi
+
+    public void setArrivalEvent(MsqEvent event) {
+        this.event[ARRIVAL] = event;
+    }
+
     private MsqEvent[] event;   // event[0]=next arrival, [1..S]=server departures
     private MsqSum[] sum;       // statistiche per ogni server
+
+    public void addNumber() {
+        this.number++;
+    }
+
     private long number;        // job totali nel nodo (in servizio + in coda)
     private long index;         // contatore job processati
     private double area;        // integrale del numero in sistema

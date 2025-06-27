@@ -32,7 +32,7 @@ public class RideSharingSystem implements Sistema {
 
         // Esegui il centro ride-sharing
         for (int j = 0; j < RIDE_CENTERS; j++) {
-            RideSharingMultiserverNode rideNode = new RideSharingMultiserverNode(SERVERS_RIDE, rng);
+            RideSharingMultiserverNode rideNode = new RideSharingMultiserverNode(rng);
             nodes.add(rideNode);
         }
     }
@@ -89,7 +89,19 @@ public class RideSharingSystem implements Sistema {
     }
 
 
-    public static void generateFeedback(int i){
-        nodes.get(i).generateNewFeedbackArrival();
+    public static void generateFeedback(MsqEvent event) {
+        var arrEvent = new MsqEvent();
+        arrEvent.t = event.t;
+        arrEvent.x = 1;
+        if (event.postiRichiesti < 4) {
+            nodes.get(0).setArrivalEvent(arrEvent);
+            nodes.get(0).addNumber();
+        } else if (event.postiRichiesti == 4){
+            nodes.get(1).setArrivalEvent(arrEvent);
+            nodes.get(1).addNumber();
+        }else{
+            nodes.get(2).setArrivalEvent(arrEvent);
+            nodes.get(2).addNumber();
+        }
     }
 }

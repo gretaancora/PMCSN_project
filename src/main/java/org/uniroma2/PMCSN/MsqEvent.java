@@ -5,5 +5,8 @@ public class MsqEvent {        /* the next-event list    */
     int x;                    /* event status, 0 or 1   */
     int postiRichiesti;
     int capacità;
-    int cpacitàRimanente;
+    int capacitàRimanente;
+    int numRichiesteServite;
+
+
 }

@@ -14,5 +14,7 @@ public interface Node {
     double getAvgNumInNode();
     int findOne();
     void generateNewFeedbackArrival();
+    void setArrivalEvent(MsqEvent event);
+    void addNumber();
 
 }
