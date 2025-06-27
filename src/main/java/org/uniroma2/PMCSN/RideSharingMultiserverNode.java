@@ -8,7 +8,6 @@ import java.util.ListIterator;
 
 import static org.uniroma2.PMCSN.Libs.Distributions.*;
 import static org.uniroma2.PMCSN.Libs.Distributions.idfNormal;
-import static org.uniroma2.PMCSN.RideSharingSystem.generateFeedback;
 
 public class RideSharingMultiserverNode implements Node{
 
@@ -30,18 +29,20 @@ public class RideSharingMultiserverNode implements Node{
     private static final int SERVER_MEDIUM = 5;
     private static final double P_MATCH_BUSY = 0.6;
     private static final double P_MATCH_IDLE = 0.6;
+    private static Sistema system;
 
 
     private static List<MsqEvent> pendingArrivals = new ArrayList<MsqEvent>();
 
 
-    public RideSharingMultiserverNode(Rngs rng) {
+    public RideSharingMultiserverNode(Rngs rng, Sistema system) {
         this.r = rng;
         this.sarrival = 0.0;
         this.currentTime = 0.0;
         this.number = 0;
         this.index = 0;
         this.area = 0.0;
+        this.system = system;
 
         // eventi e somme
         event = new MsqEvent[SERVERS + 1];
@@ -95,10 +96,13 @@ public class RideSharingMultiserverNode implements Node{
 
     private void matchIdleServers(int arrivalIndex, ListIterator list) {
         int i = 1;
+        double svc;
+
         while (i < SERVERS) {
             if (event[i].x == 0 && pendingArrivals.get(arrivalIndex).postiRichiesti<event[i].capacità) {
-
-                event[i].t = (event[i].t * event[i].numRichiesteServite + getServiceTime()) / (event[i].numRichiesteServite + 1);
+                svc = getServiceTime();
+                event[i].t = (event[i].t * event[i].numRichiesteServite + currentTime + svc) / (event[i].numRichiesteServite + 1);
+                event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc) / (event[i].numRichiesteServite + 1);
                 event[i].numRichiesteServite++;
                 event[i].x = 1;
                 list.remove();
@@ -106,7 +110,9 @@ public class RideSharingMultiserverNode implements Node{
                 ListIterator<MsqEvent> tempList = pendingArrivals.listIterator();
                 while (tempList.hasNext() && event[i].capacitàRimanente>0){
                     if(tempList.next().postiRichiesti<event[i].capacitàRimanente && r.random()<P_MATCH_IDLE){
-                        event[i].t = (event[i].t * event[i].numRichiesteServite + getServiceTime()) / (event[i].numRichiesteServite + 1);
+                        svc = getServiceTime();
+                        event[i].t = (event[i].t * event[i].numRichiesteServite + currentTime + svc) / (event[i].numRichiesteServite + 1);
+                        event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc) / (event[i].numRichiesteServite + 1);
                         event[i].numRichiesteServite++;
                         list.remove();
                     }
@@ -119,11 +125,15 @@ public class RideSharingMultiserverNode implements Node{
 
     private void matchActiveServers(int arrivalIndex, ListIterator list) {
         int i = 1;
+        double svc;
+
         while (i < SERVERS) {
             if (event[i].x == 1 && event[i].capacitàRimanente >= pendingArrivals.get(arrivalIndex).postiRichiesti) {
                 if (r.random() > P_MATCH_BUSY) continue; //non c'è matching
                 //se c'è il matching ricalcolo la media del tempo di servizio del server che ha matchato, elimino la richiesta dalla coda pending
-                event[i].t = (event[i].t * event[i].numRichiesteServite + getServiceTime()) / (event[i].numRichiesteServite + 1);
+                svc = getServiceTime();
+                event[i].t = (event[i].t * event[i].numRichiesteServite + currentTime + svc) / (event[i].numRichiesteServite + 1);
+                event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc) / (event[i].numRichiesteServite + 1);
                 event[i].numRichiesteServite++;
                 list.remove();
             }
@@ -132,7 +142,12 @@ public class RideSharingMultiserverNode implements Node{
     }
 
     @Override
-    public void generateNewFeedbackArrival() {
+    public void setArrivalEvent(MsqEvent event) {
+        //non utilizzato in questo tipo di centro
+    }
+
+    @Override
+    public void addNumber() {
         //non utilizzato in questo tipo di centro
     }
 
@@ -163,7 +178,7 @@ public class RideSharingMultiserverNode implements Node{
                 if (pLoss < P_EXIT) {
                     number--;
                 } else if (pLoss < FEEDBACK) {
-                    generateFeedback(event[ARRIVAL]);
+                    system.generateFeedback(event[ARRIVAL]);
                     number--;
                 } else {
                     if (pendingArrivals.get(i).t > currentTime + TIME_WINDOW) break;
@@ -175,19 +190,13 @@ public class RideSharingMultiserverNode implements Node{
 
 
         } else {
-            // DEPARTURE da server e = srv
-            index++;
-            number--;
-            // coda non vuota?
-            if (number >= SERVERS) {
-                double svc = getServiceTime();
-                event[e].t = currentTime + svc;
-                sum[e].service += svc;
-                sum[e].served++;
-                return e;
-            } else {
-                event[e].x = 0;
-            }
+            // DEPARTURE da server e
+            int serverIndex = e-1;
+            sum[serverIndex].service += event[e].svc;
+            sum[serverIndex].served += event[e].numRichiesteServite;
+            index += event[e].numRichiesteServite;
+            number -= event[e].numRichiesteServite;
+            event[e].x = 0;
         }
         return -1;
     }

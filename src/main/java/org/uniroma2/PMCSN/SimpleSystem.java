@@ -28,12 +28,14 @@ public class SimpleSystem implements Sistema{
             rng.plantSeeds(rep + 1); // imposta seed della replica
 
             for (int i = 0; i < NODES; i++) {
-                // Crea il nodo multiserver con SERVERS server
+
+                // Crea il nodo multiserver con SERVERS[i] server
                 SimpleMultiserverNode node = new SimpleMultiserverNode(SERVERS[i], rng);
                 // Esegui eventi finché il prossimo evento è prima di STOP
                 while ((tnext = node.peekNextEventTime()) < STOP) {
                     node.processNextEvent(tnext);
                 }
+
                 // Raccogli statistiche
                 totalProcessed += node.getProcessedJobs();
                 totalWaiting += node.getAvgWait();
@@ -54,5 +56,10 @@ public class SimpleSystem implements Sistema{
     public void runInfiniteSimulation() {
         // Implementazione analoga con stop condizionato (es. numero di eventi)
         throw new UnsupportedOperationException("Infinite simulation not implemented");
+    }
+
+    @Override
+    public void generateFeedback(MsqEvent event) {
+        //non usato in questo sistema
     }
 }

@@ -8,18 +8,8 @@ public class SimpleMultiserverNode implements Node{
     private static final int ARRIVAL = 0;
     private int SERVERS;
     private double sarrival;    // orario cumulato per gli arrivi
-
-    public void setArrivalEvent(MsqEvent event) {
-        this.event[ARRIVAL] = event;
-    }
-
     private MsqEvent[] event;   // event[0]=next arrival, [1..S]=server departures
     private MsqSum[] sum;       // statistiche per ogni server
-
-    public void addNumber() {
-        this.number++;
-    }
-
     private long number;        // job totali nel nodo (in servizio + in coda)
     private long index;         // contatore job processati
     private double area;        // integrale del numero in sistema
@@ -179,11 +169,12 @@ public class SimpleMultiserverNode implements Node{
         return index;
     }
 
-    public void generateNewFeedbackArrival(){
-        // ARRIVAL “esterno” o da routing
-        number++;
-        // programma il prossimo ARRIVAL esterno
-        event[ARRIVAL].t = getNextArrivalTime();
+    public void setArrivalEvent(MsqEvent event) {
+        this.event[ARRIVAL] = event;
+    }
+
+    public void addNumber() {
+        this.number++;
     }
 
 }

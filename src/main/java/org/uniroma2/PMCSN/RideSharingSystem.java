@@ -14,10 +14,12 @@ public class RideSharingSystem implements Sistema {
     private static final int REPLICAS = 50;
     // Tempo di stop della simulazione (orizzonte finito)
     private static final double STOP = 20000.0;
-    // Numero di server per ciascun SimpleMultiserverNode
-    private static final int SERVERS_SIMPLE = 2;
-    // Numero di server per il RideSharingMultiserverNode
-    private static final int SERVERS_RIDE = 4;
+    // Numero di server configurati per ciascun nodo semplice
+    public static final Integer[] SERVERS_SIMPLE = {
+            2,
+            2,
+            2
+    };
     private Rngs rng;
     private static List<Node> nodes = new ArrayList<>(4);
 
@@ -25,17 +27,19 @@ public class RideSharingSystem implements Sistema {
 
         rng = new Rngs();
 
+        //istanzia 3 centri semplici
         for (int i = 0; i < SIMPLE_CENTERS; i++) {
-            SimpleMultiserverNode center = new SimpleMultiserverNode(SERVERS_SIMPLE, rng);
+            SimpleMultiserverNode center = new SimpleMultiserverNode(SERVERS_SIMPLE[i], rng);
             nodes.add(center);
         }
 
-        // Esegui il centro ride-sharing
+        // istanzia centro ride sharing
         for (int j = 0; j < RIDE_CENTERS; j++) {
-            RideSharingMultiserverNode rideNode = new RideSharingMultiserverNode(rng);
+            RideSharingMultiserverNode rideNode = new RideSharingMultiserverNode(rng, this);
             nodes.add(rideNode);
         }
     }
+
 
     @Override
     public void runFiniteSimulation() {
@@ -44,7 +48,7 @@ public class RideSharingSystem implements Sistema {
 
         for (int rep = 0; rep < REPLICAS; rep++) {
             // Inizializza generatore RNG per ogni replica
-             rng = new Rngs();
+            rng = new Rngs();
             rng.plantSeeds(rep + 1);
 
             while (true) {
@@ -52,7 +56,7 @@ public class RideSharingSystem implements Sistema {
                 double tmin = Double.MAX_VALUE;
                 double tcurr;
 
-                // Prendo centro con prossimo evento con time minore
+                // Prendo indice centro con prossimo evento con time minore
                 for (int i = 0; i < 4; i++) {
                     tcurr = nodes.get(i).peekNextEventTime();
                     if (tcurr < tmin) {
@@ -63,7 +67,9 @@ public class RideSharingSystem implements Sistema {
 
                 if (tmin > STOP) break;
 
+                //processo il prossimo evento
                 nodes.get(j).processNextEvent(tmin);
+
                 // Raccogli statistiche
                 totalProcessed += nodes.get(j).getProcessedJobs();
                 totalWaiting += nodes.get(j).getAvgWait();
@@ -89,7 +95,7 @@ public class RideSharingSystem implements Sistema {
     }
 
 
-    public static void generateFeedback(MsqEvent event) {
+    public void generateFeedback(MsqEvent event) {
         var arrEvent = new MsqEvent();
         arrEvent.t = event.t;
         arrEvent.x = 1;
