@@ -97,6 +97,7 @@ public class RideSharingMultiserverNode implements Node{
     private void matchIdleServers(int arrivalIndex, ListIterator list) {
         int i = 1;
         double svc;
+        MsqEvent nextArrival;
 
         while (i < SERVERS) {
             if (event[i].x == 0 && pendingArrivals.get(arrivalIndex).postiRichiesti<event[i].capacità) {
@@ -105,15 +106,18 @@ public class RideSharingMultiserverNode implements Node{
                 event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc) / (event[i].numRichiesteServite + 1);
                 event[i].numRichiesteServite++;
                 event[i].x = 1;
+                event[i].capacitàRimanente -= pendingArrivals.get(arrivalIndex).postiRichiesti;
                 list.remove();
 
                 ListIterator<MsqEvent> tempList = pendingArrivals.listIterator();
                 while (tempList.hasNext() && event[i].capacitàRimanente>0){
-                    if(tempList.next().postiRichiesti<event[i].capacitàRimanente && r.random()<P_MATCH_IDLE){
+                    nextArrival = tempList.next();
+                    if(nextArrival.postiRichiesti<event[i].capacitàRimanente && r.random()<P_MATCH_IDLE){
                         svc = getServiceTime();
                         event[i].t = (event[i].t * event[i].numRichiesteServite + currentTime + svc) / (event[i].numRichiesteServite + 1);
                         event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc) / (event[i].numRichiesteServite + 1);
                         event[i].numRichiesteServite++;
+                        event[i].capacitàRimanente -= nextArrival.postiRichiesti;
                         list.remove();
                     }
                 }
@@ -135,6 +139,7 @@ public class RideSharingMultiserverNode implements Node{
                 event[i].t = (event[i].t * event[i].numRichiesteServite + currentTime + svc) / (event[i].numRichiesteServite + 1);
                 event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc) / (event[i].numRichiesteServite + 1);
                 event[i].numRichiesteServite++;
+                event[i].capacitàRimanente -= pendingArrivals.get(arrivalIndex).postiRichiesti;
                 list.remove();
             }
             i++;
@@ -197,6 +202,7 @@ public class RideSharingMultiserverNode implements Node{
             index += event[e].numRichiesteServite;
             number -= event[e].numRichiesteServite;
             event[e].x = 0;
+            event[e].capacitàRimanente = event[e].capacità;
         }
         return -1;
     }
