@@ -27,11 +27,11 @@ public class SimpleMultiserverNode implements Node{
         this.area = 0.0;
 
         // eventi e somme
-        event = new MsqEvent[servers + 1];
-        sum = new MsqSum[servers + 1];
+        event = new MsqEvent[servers + 2];
+        sum = new MsqSum[servers + 2];
 
 
-        for (int i = 0; i <= servers; i++) {
+        for (int i = 0; i <= servers+1; i++) {
             event[i] = new MsqEvent();
             sum[i] = new MsqSum();
             event[i].x = 0;
@@ -47,7 +47,7 @@ public class SimpleMultiserverNode implements Node{
     // Espone il prossimo evento attivo
     public double peekNextEventTime() {
         double tmin = Double.POSITIVE_INFINITY;
-        for (int i = 0; i <= SERVERS; i++)
+        for (int i = 0; i <= SERVERS+1; i++)
             if (event[i].x == 1 && event[i].t < tmin)
                 tmin = event[i].t;
         return tmin;
@@ -56,7 +56,7 @@ public class SimpleMultiserverNode implements Node{
     public int peekNextEventType() {
         int best = -1;
         double tmin = Double.POSITIVE_INFINITY;
-        for (int i = 0; i <= SERVERS; i++)
+        for (int i = 0; i <= SERVERS+1; i++)
             if (event[i].x == 1 && event[i].t < tmin) {
                 tmin = event[i].t;
                 best = i;
@@ -73,25 +73,27 @@ public class SimpleMultiserverNode implements Node{
         area += (tnext - currentTime) * number;
         currentTime = tnext;
 
-        if (e == ARRIVAL) {
-            // ARRIVAL “esterno” o da routing
-            number++;
-            // programma il prossimo ARRIVAL esterno
-            event[ARRIVAL].t = getNextArrivalTime();
-            double pLoss = r.random();
-            if (pLoss < P_EXIT) {
-                number--;
-            } else {
-                // se server disponibile, avvia subito il servizio
-                if (number <= SERVERS) {
-                    double svc = getServiceTime();
-                    int srv = findOne();
-                    event[srv].t = currentTime + svc;
-                    event[srv].x = 1;
-                    sum[srv].service += svc;
-                    sum[srv].served++;
-                    return srv;
+        if (e <2) {
+            if (e == ARRIVAL) {
+                // ARRIVAL “esterno” o da routing
+                number++;
+                // programma il prossimo ARRIVAL esterno
+                event[ARRIVAL].t = getNextArrivalTime();
+                double pLoss = r.random();
+                if (pLoss < P_EXIT) {
+                    number--;
                 }
+            }
+
+            int srv = findOne();
+            if (srv != -1) {
+                double svc = getServiceTime();
+                event[srv].t = currentTime + svc;
+                event[srv].x = 1;
+                sum[srv].service += svc;
+                sum[srv].served++;
+                // non incremento number perché è in servizio, non in coda
+                return srv;
             }
 
         } else {
@@ -138,13 +140,12 @@ public class SimpleMultiserverNode implements Node{
 
 
     public int findOne() {
-        int s=1; //in 0 abbiamo arrivo
-
-        while (true){
-            if (event[s++].x == 0) break;  //trova il primo libero
+        for (int s = 2; s <= SERVERS+1; s++) {
+            if (event[s].x == 0) {
+                return s;
+            }
         }
-
-        return s;
+        return -1;  // nessun server libero
     }
 
 
