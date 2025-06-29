@@ -19,7 +19,7 @@ public class SimpleMultiserverNode implements Node{
     private double area;        // integrale del numero in sistema
     private double currentTime;
     private Rngs r;
-    private static double P_EXIT = 0.05;
+    private static double P_EXIT = 0.2;
 
     public SimpleMultiserverNode(int servers, Rngs rng) {
         this.SERVERS = servers;
@@ -75,6 +75,10 @@ public class SimpleMultiserverNode implements Node{
         double tnext = event.get(e).t;
         // integrazione area
         area += (tnext - currentTime) * number;
+//        System.out.println("number: " + number);
+//        System.out.println("tnext: " + tnext);
+//        System.out.println("currenttime: " + currentTime);
+      //  System.out.println("Area SIMPLE: " + area);
         currentTime = tnext;
 
         if (e == ARRIVAL || e>SERVERS) {
@@ -83,9 +87,12 @@ public class SimpleMultiserverNode implements Node{
                 number++;
                 // programma il prossimo ARRIVAL esterno
                 event.get(ARRIVAL).t = getNextArrivalTime();
+                //sarrival++;
+                //System.out.println("Arrivo: " + sarrival);
                 double pLoss = r.random();
                 if (pLoss < P_EXIT) {
                     number--;
+                    return -1;
                 }
             }
 
@@ -107,6 +114,7 @@ public class SimpleMultiserverNode implements Node{
         } else {
             // DEPARTURE da server e = srv
             index++;
+           // System.out.println("Completamento SIMPLE: " + index);
             number--;
             // coda non vuota?
             if (number >= SERVERS) {
@@ -127,7 +135,7 @@ public class SimpleMultiserverNode implements Node{
 
     public double getNextArrivalTime() {
         r.selectStream(0);
-        sarrival += exponential(2.0, r);
+        sarrival += exponential(20, r);
         //System.out.println("Arrivo a:" + sarrival);
         return sarrival;
     }
@@ -137,15 +145,15 @@ public class SimpleMultiserverNode implements Node{
         r.selectStream(1);
         //return uniform(2.0, 10.0, r);
         double alpha, beta;
-        double a = 1;
+        double a = 2;
         double b = 60;
 
-        alpha = cdfNormal(30.0, 2.0, a);
-        beta = cdfNormal(30.0, 2.0, b);
+        alpha = cdfNormal(1.0, 2.0, a);
+        beta = cdfNormal(1.0, 2.0, b);
 
         double u = uniform(alpha, beta, r);
-        System.out.println("Servizio:" + idfNormal(30.0, 2.0, u));
-        return idfNormal(30.0, 2.0, u);
+        //System.out.println("Servizio:" + idfNormal(30.0, 2.0, u));
+        return idfNormal(1.0, 2.0, u);
     }
 
 

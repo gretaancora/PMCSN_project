@@ -13,12 +13,12 @@ public class RideSharingSystem implements Sistema {
     // Numero di repliche da effettuare
     private static final int REPLICAS = 50;
     // Tempo di stop della simulazione (orizzonte finito)
-    private static final double STOP = 20000.0;
+    private static final double STOP = 2000.0;
     // Numero di server configurati per ciascun nodo semplice
     public static final Integer[] SERVERS_SIMPLE = {
-            2,
-            2,
-            2
+            20,
+            20,
+            20
     };
     private Rngs rng;
     private static List<Node> nodes = new ArrayList<>(4);
@@ -69,17 +69,17 @@ public class RideSharingSystem implements Sistema {
 
                 //processo il prossimo evento
                 nodes.get(j).processNextEvent(tmin);
-
-                // Raccogli statistiche
-                totalProcessed += nodes.get(j).getProcessedJobs();
-                totalWaiting += nodes.get(j).getAvgWait();
             }
+
+            // Raccogli statistiche
+            totalProcessed += nodes.get(rep).getProcessedJobs();
+            totalWaiting += nodes.get(rep).getAvgWait();
 
         }
 
         // Calcola medie
-        double avgProcessed = totalProcessed / (REPLICAS * SIMPLE_CENTERS);
-        double avgWaiting = totalWaiting / (REPLICAS * RIDE_CENTERS);
+        double avgProcessed = totalProcessed / (REPLICAS * (RIDE_CENTERS + SIMPLE_CENTERS));
+        double avgWaiting = totalWaiting / (REPLICAS * (RIDE_CENTERS + SIMPLE_CENTERS));
 
         // Stampa risultati
         System.out.println("=== RideSharingSystem (Finite Simulation) ===");

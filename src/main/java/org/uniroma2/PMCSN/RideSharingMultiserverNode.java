@@ -11,7 +11,7 @@ import static org.uniroma2.PMCSN.Libs.Distributions.idfNormal;
 public class RideSharingMultiserverNode implements Node{
 
     private static final int ARRIVAL = 0;
-    private static final int SERVERS = 15;
+    private static final int SERVERS = 30;
     private double sarrival;    // orario cumulato per gli arrivi
     private final MsqEvent[] event;   // event[0]=next arrival, [1..S]=server departures
     private final MsqSum[] sum;       // statistiche per ogni server
@@ -21,11 +21,11 @@ public class RideSharingMultiserverNode implements Node{
     private double currentTime;
     private final Rngs r;
     private static final double P_EXIT = 0.5;
-    private static final double FEEDBACK = 0.2;
+    private static final double FEEDBACK = 0.7;
     private static final double DELAY = 5;
-    private static final double TIME_WINDOW = 5;
-    private static final int SERVER_SMALL = 5;
-    private static final int SERVER_MEDIUM = 5;
+    private static final double TIME_WINDOW = 100;
+    private static final int SERVER_SMALL = 10;
+    private static final int SERVER_MEDIUM = 10;
     private static final double P_MATCH_BUSY = 0.6;
     private static final double P_MATCH_IDLE = 0.6;
     private static Sistema system;
@@ -54,12 +54,15 @@ public class RideSharingMultiserverNode implements Node{
                 if (i < SERVER_SMALL) {
                     event[i].capacità = 3;
                     event[i].capacitàRimanente = 3;
+                    event[i].numRichiesteServite = 0;
                 } else if (i < SERVER_SMALL + SERVER_MEDIUM) {
                     event[i].capacità = 4;
                     event[i].capacitàRimanente = 4;
+                    event[i].numRichiesteServite = 0;
                 } else {
                     event[i].capacità = 8;
                     event[i].capacitàRimanente = 8;
+                    event[i].numRichiesteServite = 0;
                 }
             }
             sum[i] = new MsqSum();
@@ -82,6 +85,8 @@ public class RideSharingMultiserverNode implements Node{
     public int findOne() {
         int totalMatched = 0;
         boolean servedSomething;
+      //  System.out.println("Size pre matching: " + pendingArrivals.size());
+        int numMatch = 0;
 
         do {
             servedSomething = false;
@@ -112,6 +117,7 @@ public class RideSharingMultiserverNode implements Node{
                         event[i].capacitàRimanente -= req.postiRichiesti;
 
                         matched = true;
+
                     }
                 }
 
@@ -130,11 +136,14 @@ public class RideSharingMultiserverNode implements Node{
                             event[i].capacitàRimanente -= req.postiRichiesti;
 
                             matched = true;
+
                         }
                     }
                 }
 
+
                 if (matched) {
+                    numMatch++;
                     // rimuovo dal pending e aggiorno contatori
                     pendingArrivals.remove(req);
                     totalMatched++;
@@ -144,6 +153,10 @@ public class RideSharingMultiserverNode implements Node{
             }
 
         } while (servedSomething);
+
+    //    System.out.println("Total matches: " + totalMatched);
+    //    System.out.println("Size post matching: " + pendingArrivals.size());
+
 
         return totalMatched;
     }
@@ -169,13 +182,19 @@ public class RideSharingMultiserverNode implements Node{
         double tnext = event[e].t;
         // integrazione area
         area += (tnext - currentTime) * number;
+     //   System.out.println("RS number: " + number);
+        //System.out.println("RS tnext: " + tnext);
+        //System.out.println("RS currenttime: " + currentTime);
+    //    System.out.println("RS Area: " + area);
+        //System.out.println("RS index: " + index);
         currentTime = tnext;
-
+        //System.out.println(e);
         if (e == ARRIVAL) {
             // ARRIVAL “esterno” o da routing
             number++;
             // programma il prossimo ARRIVAL esterno
             event[ARRIVAL].t = getNextArrivalTime();
+            pendingArrivals.add(event[ARRIVAL]);
 
             int i = 0;
             while (true) {
@@ -190,9 +209,11 @@ public class RideSharingMultiserverNode implements Node{
                 double pLoss = r.random();
                 if (pLoss < P_EXIT) {
                     pendingArrivals.remove(i);
+                    return -1;
                 } else if (pLoss < FEEDBACK) {
                     system.generateFeedback(pendingArrivals.get(i));
                     pendingArrivals.remove(i);
+                    return -1;
                 }else{
                     number++;
                     i++;
@@ -208,9 +229,12 @@ public class RideSharingMultiserverNode implements Node{
             sum[serverIndex].service += event[e].svc;
             sum[serverIndex].served += event[e].numRichiesteServite;
             index += event[e].numRichiesteServite;
-            number -= event[e].numRichiesteServite;
+         //   System.out.println("Index: "+ index);
+            number-=event[e].numRichiesteServite;
+            System.out.println("Numero richieste servite: " + event[e].numRichiesteServite);
             event[e].x = 0;
             event[e].capacitàRimanente = event[e].capacità;
+            event[e].numRichiesteServite = 0;
         }
         return -1;
     }
@@ -237,7 +261,7 @@ public class RideSharingMultiserverNode implements Node{
 
     public double getNextArrivalTime() {
         r.selectStream(0);
-        sarrival += exponential(2.0, r);
+        sarrival += exponential(20, r);
         return sarrival;
     }
 
@@ -250,12 +274,12 @@ public class RideSharingMultiserverNode implements Node{
         double a = 1;
         double b = 60;
 
-        alpha = cdfNormal(30, 2.0, a);
-        beta = cdfNormal(30, 2.0, b);
+        alpha = cdfNormal(1.0, 2.0, a);
+        beta = cdfNormal(1.0, 2.0, b);
 
         double u = uniform(alpha, beta, r);
-        System.out.println("Servizio: " + idfNormal(30, 2.0, u)+DELAY);
-        return (idfNormal(30, 2.0, u)+DELAY);
+        //System.out.println("Servizio: " + idfNormal(30, 2.0, u)+DELAY);
+        return (idfNormal(1.0, 2.0, u)+DELAY);
     }
 
 
@@ -285,6 +309,9 @@ public class RideSharingMultiserverNode implements Node{
     }
 
     public double getAvgWait() {
+      //  System.out.println(area);
+      //  System.out.println(index);
+      //  System.out.println(area/index);
         return area / index;
     }
 

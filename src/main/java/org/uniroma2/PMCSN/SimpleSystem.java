@@ -8,12 +8,12 @@ public class SimpleSystem implements Sistema{
     // Numero di repliche da effettuare
     private static final int REPLICAS = 1;
     // Tempo di stop della simulazione (orizzonte finito)
-    private static final double STOP = 20000.0;
+    private static final double STOP = 2000.0;
     // Numero di server configurati per ciascun nodo
     public static final Integer[] SERVERS = {
-            2,
-            2,
-            2
+            20,
+            20,
+            20
     };
 
     @Override
