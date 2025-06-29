@@ -4,7 +4,6 @@ import org.uniroma2.PMCSN.Libs.Rngs;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ListIterator;
 
 import static org.uniroma2.PMCSN.Libs.Distributions.*;
 import static org.uniroma2.PMCSN.Libs.Distributions.idfNormal;
@@ -42,7 +41,7 @@ public class RideSharingMultiserverNode implements Node{
         this.number = 0;
         this.index = 0;
         this.area = 0.0;
-        this.system = system;
+        RideSharingMultiserverNode.system = system;
 
         // eventi e somme
         event = new MsqEvent[SERVERS + 1];
@@ -74,79 +73,83 @@ public class RideSharingMultiserverNode implements Node{
         event[ARRIVAL].x = 1;
     }
 
-    // trova server libero
-    //chi rimane fuori rimane nella coda pending e mettiamo in event[0]
+    /**
+     * Tenta di servire quante più richieste possibili dalla coda pendingArrivals.
+     * Prima prova su server già attivi (P_MATCH_BUSY), poi su server inattivi.
+     * Ripete finché in un passaggio non viene servita almeno una richiesta.
+     * @return numero di richieste servite in totale in questo invocazione di findOne()*/
+
     public int findOne() {
+        int totalMatched = 0;
+        boolean servedSomething;
 
-        ListIterator<MsqEvent> list = pendingArrivals.listIterator();
-        //lista di job in attesa di essere serviti
+        do {
+            servedSomething = false;
 
-        //match con server attivi
-        while (list.hasNext()){
-            matchActiveServers(list.nextIndex(), list);
-       }
+            // Se non ci sono richieste pendenti, esco subito
+            if (pendingArrivals.isEmpty()) {
+                break;
+            }
 
-        list = pendingArrivals.listIterator();
+            // Faccio un “snapshot” della coda
+            List<MsqEvent> snapshot = new ArrayList<>(pendingArrivals);
 
-        //match con server inattivi
-        while(list.hasNext()){
-            matchIdleServers(list.nextIndex(), list);
-        }
+            // Scorro snapshot, ma rimuovo da pendingArrivals
+            for (MsqEvent req : snapshot) {
+                boolean matched = false;
 
-        return 0; //forse da modificare
-    }
+                // 1) server attivi
+                for (int i = 1; i <= SERVERS && !matched; i++) {
+                    if (event[i].x == 1
+                            && event[i].capacitàRimanente >= req.postiRichiesti
+                            && r.random() < P_MATCH_BUSY) {
 
-    private void matchIdleServers(int arrivalIndex, ListIterator list) {
-        int i = 1;
-        double svc;
-        MsqEvent nextArrival;
-
-        while (i < SERVERS) {
-            if (event[i].x == 0 && pendingArrivals.get(arrivalIndex).postiRichiesti<event[i].capacità) {
-                svc = getServiceTime();
-                event[i].t = (event[i].t * event[i].numRichiesteServite + currentTime + svc) / (event[i].numRichiesteServite + 1);
-                event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc) / (event[i].numRichiesteServite + 1);
-                event[i].numRichiesteServite++;
-                event[i].x = 1;
-                event[i].capacitàRimanente -= pendingArrivals.get(arrivalIndex).postiRichiesti;
-                list.remove();
-
-                ListIterator<MsqEvent> tempList = pendingArrivals.listIterator();
-                while (tempList.hasNext() && event[i].capacitàRimanente>0){
-                    nextArrival = tempList.next();
-                    if(nextArrival.postiRichiesti<event[i].capacitàRimanente && r.random()<P_MATCH_IDLE){
-                        svc = getServiceTime();
-                        event[i].t = (event[i].t * event[i].numRichiesteServite + currentTime + svc) / (event[i].numRichiesteServite + 1);
-                        event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc) / (event[i].numRichiesteServite + 1);
+                        double svc = getServiceTime();
+                        event[i].t = currentTime + svc;
+                        event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc)
+                                / (event[i].numRichiesteServite + 1);
                         event[i].numRichiesteServite++;
-                        event[i].capacitàRimanente -= nextArrival.postiRichiesti;
-                        list.remove();
+                        event[i].capacitàRimanente -= req.postiRichiesti;
+
+                        matched = true;
                     }
                 }
-                return;
+
+                // 2) server inattivi
+                if (!matched) {
+                    for (int i = 1; i <= SERVERS && !matched; i++) {
+                        if (event[i].x == 0
+                                && event[i].capacitàRimanente >= req.postiRichiesti && r.random() < P_MATCH_IDLE) {
+
+                            double svc = getServiceTime();
+                            event[i].t = currentTime + svc;
+                            event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc)
+                                    / (event[i].numRichiesteServite + 1);
+                            event[i].numRichiesteServite++;
+                            event[i].x = 1;
+                            event[i].capacitàRimanente -= req.postiRichiesti;
+
+                            matched = true;
+                        }
+                    }
+                }
+
+                if (matched) {
+                    // rimuovo dal pending e aggiorno contatori
+                    pendingArrivals.remove(req);
+                    totalMatched++;
+                    servedSomething = true;
+                    break;  // esco dal for(snapshot) per ripartire da capo
+                }
             }
-            i++;
-        }
+
+        } while (servedSomething);
+
+        return totalMatched;
     }
 
-    private void matchActiveServers(int arrivalIndex, ListIterator list) {
-        int i = 1;
-        double svc;
 
-        while (i < SERVERS) {
-            if (event[i].x == 1 && event[i].capacitàRimanente >= pendingArrivals.get(arrivalIndex).postiRichiesti) {
-                if (r.random() > P_MATCH_BUSY) continue; //non c'è matching
-                //se c'è il matching ricalcolo la media del tempo di servizio del server che ha matchato, elimino la richiesta dalla coda pending
-                svc = getServiceTime();
-                event[i].t = (event[i].t * event[i].numRichiesteServite + currentTime + svc) / (event[i].numRichiesteServite + 1);
-                event[i].svc = (event[i].svc * event[i].numRichiesteServite + svc) / (event[i].numRichiesteServite + 1);
-                event[i].numRichiesteServite++;
-                event[i].capacitàRimanente -= pendingArrivals.get(arrivalIndex).postiRichiesti;
-                list.remove();
-            }
-            i++;
-        }
-    }
+
 
     @Override
     public void setArrivalEvent(MsqEvent event) {
