@@ -1,6 +1,10 @@
 package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.uniroma2.PMCSN.Libs.Distributions.*;
 
 public class SimpleMultiserverNode implements Node{
@@ -8,7 +12,7 @@ public class SimpleMultiserverNode implements Node{
     private static final int ARRIVAL = 0;
     private int SERVERS;
     private double sarrival;    // orario cumulato per gli arrivi
-    private MsqEvent[] event;   // event[0]=next arrival, [1..S]=server departures
+    private List<MsqEvent> event;   // event[0]=next arrival, [1..S]=server departures
     private MsqSum[] sum;       // statistiche per ogni server
     private long number;        // job totali nel nodo (in servizio + in coda)
     private long index;         // contatore job processati
@@ -27,38 +31,38 @@ public class SimpleMultiserverNode implements Node{
         this.area = 0.0;
 
         // eventi e somme
-        event = new MsqEvent[servers + 2];
+        event = new ArrayList<>();
         sum = new MsqSum[servers + 2];
 
 
         for (int i = 0; i <= servers+1; i++) {
-            event[i] = new MsqEvent();
+            event.add(i, new MsqEvent());
             sum[i] = new MsqSum();
-            event[i].x = 0;
+            event.get(i).x = 0;
             sum[i].service = 0.0;
             sum[i].served = 0;
         }
 
         // schedulo il primo arrivo “esterno”
-        event[ARRIVAL].t = getNextArrivalTime();
-        event[ARRIVAL].x = 1;
+        event.get(ARRIVAL).t = getNextArrivalTime();
+        event.get(ARRIVAL).x = 1;
     }
 
     // Espone il prossimo evento attivo
     public double peekNextEventTime() {
         double tmin = Double.POSITIVE_INFINITY;
-        for (int i = 0; i <= SERVERS+1; i++)
-            if (event[i].x == 1 && event[i].t < tmin)
-                tmin = event[i].t;
+        for (int i = 0; i < event.size(); i++)
+            if (event.get(i).x == 1 && event.get(i).t < tmin)
+                tmin = event.get(i).t;
         return tmin;
     }
 
     public int peekNextEventType() {
         int best = -1;
         double tmin = Double.POSITIVE_INFINITY;
-        for (int i = 0; i <= SERVERS+1; i++)
-            if (event[i].x == 1 && event[i].t < tmin) {
-                tmin = event[i].t;
+        for (int i = 0; i < event.size(); i++)
+            if (event.get(i).x == 1 && event.get(i).t < tmin) {
+                tmin = event.get(i).t;
                 best = i;
             }
         return best;
@@ -68,17 +72,17 @@ public class SimpleMultiserverNode implements Node{
     // e restituisce eventuale DEPARTURE schedulato (server index), oppure -1.
     public int processNextEvent(double t) {
         int e = peekNextEventType();
-        double tnext = event[e].t;
+        double tnext = event.get(e).t;
         // integrazione area
         area += (tnext - currentTime) * number;
         currentTime = tnext;
 
-        if (e <2) {
+        if (e == ARRIVAL || e>SERVERS) {
             if (e == ARRIVAL) {
                 // ARRIVAL “esterno” o da routing
                 number++;
                 // programma il prossimo ARRIVAL esterno
-                event[ARRIVAL].t = getNextArrivalTime();
+                event.get(ARRIVAL).t = getNextArrivalTime();
                 double pLoss = r.random();
                 if (pLoss < P_EXIT) {
                     number--;
@@ -88,10 +92,14 @@ public class SimpleMultiserverNode implements Node{
             int srv = findOne();
             if (srv != -1) {
                 double svc = getServiceTime();
-                event[srv].t = currentTime + svc;
-                event[srv].x = 1;
+                event.get(srv).t = currentTime + svc;
+                event.get(srv).x = 1;
                 sum[srv].service += svc;
                 sum[srv].served++;
+                //se ho processato arrivo esterno lo elimino dalla coda degli eventi
+                if (e>SERVERS){
+                    event.remove(e);
+                }
                 // non incremento number perché è in servizio, non in coda
                 return srv;
             }
@@ -103,12 +111,12 @@ public class SimpleMultiserverNode implements Node{
             // coda non vuota?
             if (number >= SERVERS) {
                 double svc = getServiceTime();
-                event[e].t = currentTime + svc;
+                event.get(e).t = currentTime + svc;
                 sum[e].service += svc;
                 sum[e].served++;
                 return e;
             } else {
-                event[e].x = 0;
+                event.get(e).x = 0;
             }
         }
 
@@ -142,8 +150,8 @@ public class SimpleMultiserverNode implements Node{
 
 
     public int findOne() {
-        for (int s = 2; s <= SERVERS+1; s++) {
-            if (event[s].x == 0) {
+        for (int s = 1; s <= SERVERS; s++) {
+            if (event.get(s).x == 0) {
                 return s;
             }
         }
@@ -153,7 +161,7 @@ public class SimpleMultiserverNode implements Node{
 
     // Metodi per statistiche a fine run
     public double getAvgInterArrival() {
-        return event[ARRIVAL].t / index;
+        return event.get(ARRIVAL).t / index;
     }
 
     public double getAvgWait() {
@@ -173,7 +181,7 @@ public class SimpleMultiserverNode implements Node{
     }
 
     public void setArrivalEvent(MsqEvent event) {
-        this.event[1] = event;
+        this.event.add(event);
     }
 
     public void addNumber() {
