@@ -79,19 +79,21 @@ public class RideSharingMultiserverNode implements Node{
     public int findOne() {
 
         ListIterator<MsqEvent> list = pendingArrivals.listIterator();
+        //lista di job in attesa di essere serviti
 
+        //match con server attivi
         while (list.hasNext()){
             matchActiveServers(list.nextIndex(), list);
        }
 
         list = pendingArrivals.listIterator();
 
+        //match con server inattivi
         while(list.hasNext()){
             matchIdleServers(list.nextIndex(), list);
         }
 
-        return 0;
-
+        return 0; //forse da modificare
     }
 
     private void matchIdleServers(int arrivalIndex, ListIterator list) {
