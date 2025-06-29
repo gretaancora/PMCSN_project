@@ -96,17 +96,14 @@ public class RideSharingSystem implements Sistema {
 
 
     public void generateFeedback(MsqEvent event) {
-        var arrEvent = new MsqEvent();
-        arrEvent.t = event.t;
-        arrEvent.x = 1;
         if (event.postiRichiesti < 4) {
-            nodes.get(0).setArrivalEvent(arrEvent);
+            nodes.get(0).setArrivalEvent(event);
             nodes.get(0).addNumber();
         } else if (event.postiRichiesti == 4){
-            nodes.get(1).setArrivalEvent(arrEvent);
+            nodes.get(1).setArrivalEvent(event);
             nodes.get(1).addNumber();
         }else{
-            nodes.get(2).setArrivalEvent(arrEvent);
+            nodes.get(2).setArrivalEvent(event);
             nodes.get(2).addNumber();
         }
     }

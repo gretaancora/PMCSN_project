@@ -20,8 +20,8 @@ public class RideSharingMultiserverNode implements Node{
     private double area;        // integrale del numero in sistema
     private double currentTime;
     private final Rngs r;
-    private static final double P_EXIT = 0.05;
-    private static final double FEEDBACK = 0.15;
+    private static final double P_EXIT = 0.5;
+    private static final double FEEDBACK = 0.2;
     private static final double DELAY = 5;
     private static final double TIME_WINDOW = 5;
     private static final int SERVER_SMALL = 5;
@@ -183,15 +183,18 @@ public class RideSharingMultiserverNode implements Node{
                 pendingArrivals.get(i).t = getNextArrivalTime();
                 pendingArrivals.get(i).x = 1;
                 pendingArrivals.get(i).postiRichiesti = getNumPosti();
-                number++;
+                if (pendingArrivals.get(i).t > currentTime + TIME_WINDOW){
+                    pendingArrivals.remove(i);
+                    break;
+                }
                 double pLoss = r.random();
                 if (pLoss < P_EXIT) {
-                    number--;
+                    pendingArrivals.remove(i);
                 } else if (pLoss < FEEDBACK) {
-                    system.generateFeedback(event[ARRIVAL]);
-                    number--;
-                } else {
-                    if (pendingArrivals.get(i).t > currentTime + TIME_WINDOW) break;
+                    system.generateFeedback(pendingArrivals.get(i));
+                    pendingArrivals.remove(i);
+                }else{
+                    number++;
                     i++;
                 }
             }
@@ -247,11 +250,12 @@ public class RideSharingMultiserverNode implements Node{
         double a = 1;
         double b = 60;
 
-        alpha = cdfNormal(1.5, 2.0, a);
-        beta = cdfNormal(1.5, 2.0, b);
+        alpha = cdfNormal(30, 2.0, a);
+        beta = cdfNormal(30, 2.0, b);
 
-        double u = uniform(alpha, 1.0-beta, r);
-        return (idfNormal(1.5, 2.0, u)+DELAY);
+        double u = uniform(alpha, beta, r);
+        System.out.println("Servizio: " + idfNormal(30, 2.0, u)+DELAY);
+        return (idfNormal(30, 2.0, u)+DELAY);
     }
 
 

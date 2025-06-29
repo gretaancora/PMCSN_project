@@ -120,6 +120,7 @@ public class SimpleMultiserverNode implements Node{
     public double getNextArrivalTime() {
         r.selectStream(0);
         sarrival += exponential(2.0, r);
+        //System.out.println("Arrivo a:" + sarrival);
         return sarrival;
     }
 
@@ -131,11 +132,12 @@ public class SimpleMultiserverNode implements Node{
         double a = 1;
         double b = 60;
 
-        alpha = cdfNormal(1.5, 2.0, a);
-        beta = cdfNormal(1.5, 2.0, b);
+        alpha = cdfNormal(30.0, 2.0, a);
+        beta = cdfNormal(30.0, 2.0, b);
 
-        double u = uniform(alpha, 1.0-beta, r);
-        return idfNormal(1.5, 2.0, u);
+        double u = uniform(alpha, beta, r);
+        System.out.println("Servizio:" + idfNormal(30.0, 2.0, u));
+        return idfNormal(30.0, 2.0, u);
     }
 
 
@@ -171,7 +173,7 @@ public class SimpleMultiserverNode implements Node{
     }
 
     public void setArrivalEvent(MsqEvent event) {
-        this.event[ARRIVAL] = event;
+        this.event[1] = event;
     }
 
     public void addNumber() {
