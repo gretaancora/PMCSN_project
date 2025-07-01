@@ -12,18 +12,18 @@ public class SimpleSystem implements Sistema{
     // Numero di repliche da effettuare
     private static final int REPLICAS = 4;
     // Tempo di stop della simulazione (orizzonte finito)
-    private static final double STOP = 200000.0;
+    private static final double STOP = 1000.0;
     // Numero di server configurati per ciascun nodo
     public static final Integer[] SERVERS = {
-            20,
-            20,
-            20
+            33,
+            11,
+            11
     };
 
     @Override
     public void runFiniteSimulation() {
         double totalProcessed = 0.0;
-        double totalWaiting = 0.0;
+        double totalResponse = 0.0;
         double tnext;
 
         for (int rep = 0; rep < REPLICAS; rep++) {
@@ -42,18 +42,18 @@ public class SimpleSystem implements Sistema{
 
                 // Raccogli statistiche
                 totalProcessed += node.getProcessedJobs();
-                totalWaiting += node.getAvgWait();
+                totalResponse += node.getAvgResponse();
             }
         }
 
         // Stampa risultati medi
         double avgProcessedPerNode = totalProcessed / (REPLICAS * NODES);
-        double avgWaitingPerNode = totalWaiting / (REPLICAS * NODES);
+        double avgResponsePerNode = totalResponse / (REPLICAS * NODES);
 
         System.out.println("=== SimpleSystem (Finite Simulation) ===");
         System.out.printf("Repliche: %d, Nodi per replica: %d%n", REPLICAS, NODES);
         System.out.printf("Avg. processed jobs per node: %.2f%n", avgProcessedPerNode);
-        System.out.printf("Avg. wait time per node:    %.2f%n", avgWaitingPerNode);
+        System.out.printf("Avg. response time per node:    %.2f%n", avgResponsePerNode);
     }
 
 
@@ -111,16 +111,16 @@ public class SimpleSystem implements Sistema{
                 long  jobsSys = 0;
                 for (int i = 0; i < NODES; i++) {
                     // getAvgWait * getProcessedJobs = area del singolo nodo
-                    areaSys += nodes[i].getAvgWait() * nodes[i].getProcessedJobs();
+                    areaSys += nodes[i].getAvgResponse() * nodes[i].getProcessedJobs();
                     jobsSys += nodes[i].getProcessedJobs();
                 }
                 // Somma dei tempi d'attesa di questo batch sul sistema
                 double batchSum = areaSys - lastAreaSys;
-                double meanWait = batchSum / BATCH_SIZE;
-                batchMeans.add(meanWait);
+                double meanResponse = batchSum / BATCH_SIZE;
+                batchMeans.add(meanResponse);
 
                 System.out.printf("Batch %2d chiuso: mean wait sistema = %.4f%n",
-                        BatchMeans.getNBatch(), meanWait);
+                        BatchMeans.getNBatch(), meanResponse);
 
                 // Preparo il batch successivo
                 lastAreaSys = areaSys;
@@ -141,7 +141,7 @@ public class SimpleSystem implements Sistema{
 
         System.out.println("\n=== Summary Infinite Simulation ===");
         System.out.printf("Totale batch: %d%n", N_BATCHES);
-        System.out.printf("Avg. of batch-means wait (sistema):     %.4f%n", meanOfMeans);
+        System.out.printf("Avg. of batch-means response (sistema):     %.4f%n", meanOfMeans);
         System.out.printf("Avg. of batch-means variance (sistema): %.4f%n", var);
     }
 

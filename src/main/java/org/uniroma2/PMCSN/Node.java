@@ -8,7 +8,7 @@ public interface Node {
     double getNextArrivalTime();
     double getServiceTime();
     double getAvgInterArrival();
-    double getAvgWait();
+    double getAvgResponse();
     long getProcessedJobs();
     double getCurrentTime();
     double getAvgNumInNode();

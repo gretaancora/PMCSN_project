@@ -11,7 +11,7 @@ import static org.uniroma2.PMCSN.Libs.Distributions.idfNormal;
 public class RideSharingMultiserverNode implements Node{
 
     private static final int ARRIVAL = 0;
-    private static final int SERVERS = 30;
+    private static final int SERVERS = 20;
     private double sarrival;    // orario cumulato per gli arrivi
     private final MsqEvent[] event;   // event[0]=next arrival, [1..S]=server departures
     private final MsqSum[] sum;       // statistiche per ogni server
@@ -20,13 +20,13 @@ public class RideSharingMultiserverNode implements Node{
     private double area;        // integrale del numero in sistema
     private double currentTime;
     private final Rngs r;
-    private static final double P_EXIT = 0.5;
-    private static final double FEEDBACK = 0.7;
-    private static final double DELAY = 5;
-    private static final double TIME_WINDOW = 100;
+    private static final double P_EXIT = 0.2;
+    private static final double FEEDBACK = 0.4;
+    private static final double DELAY = 10;
+    private static final double TIME_WINDOW = 5;
     private static final int SERVER_SMALL = 10;
-    private static final int SERVER_MEDIUM = 10;
-    private static final int SERVER_LARGE = 10;
+    private static final int SERVER_MEDIUM = 5;
+    private static final int SERVER_LARGE = 5;
     private static final double P_MATCH_BUSY = 0.6;
     private static final double P_MATCH_IDLE = 0.6;
     private static Sistema system;
@@ -271,7 +271,7 @@ public class RideSharingMultiserverNode implements Node{
 
     public double getNextArrivalTime() {
         r.selectStream(0);
-        double lambda = 0.02*0.3;
+        double lambda = 1.65 * 0.3;
         sarrival += exponential(1/lambda, r);
         return sarrival;
     }
@@ -285,12 +285,12 @@ public class RideSharingMultiserverNode implements Node{
         double a = 1;
         double b = 60;
 
-        alpha = cdfNormal(1.0, 2.0, a);
-        beta = cdfNormal(1.0, 2.0, b);
+        alpha = cdfNormal(20.0, 2.0, a);
+        beta = cdfNormal(20.0, 2.0, b);
 
         double u = uniform(alpha, beta, r);
         //System.out.println("Servizio: " + idfNormal(30, 2.0, u)+DELAY);
-        return (idfNormal(1.0, 2.0, u)+DELAY);
+        return (idfNormal(20.0, 2.0, u)+DELAY);
     }
 
 
@@ -319,7 +319,7 @@ public class RideSharingMultiserverNode implements Node{
         return event[ARRIVAL].t / index;
     }
 
-    public double getAvgWait() {
+    public double getAvgResponse() {
       //  System.out.println(area);
       //  System.out.println(index);
       //  System.out.println(area/index);

@@ -13,12 +13,12 @@ public class RideSharingSystem implements Sistema {
     // Numero di repliche da effettuare
     private static final int REPLICAS = 4;
     // Tempo di stop della simulazione (orizzonte finito)
-    private static final double STOP = 200000.0;
+    private static final double STOP = 1000.0;
     // Numero di server configurati per ciascun nodo semplice
     public static final Integer[] SERVERS_SIMPLE = {
-            20,
-            20,
-            20
+            23,
+            6,
+            6
     };
     private static final int SERVERS_RIDESHARING = 30;
     private Rngs rng;
@@ -75,7 +75,7 @@ public class RideSharingSystem implements Sistema {
             // Raccogli statistiche
             for (int i = 0; i < 4; i++) {
                 totalProcessed += nodes.get(i).getProcessedJobs();
-                totalWaiting += nodes.get(i).getAvgWait();
+                totalWaiting += nodes.get(i).getAvgResponse();
             }
         }
 
@@ -88,7 +88,7 @@ public class RideSharingSystem implements Sistema {
         System.out.printf("Repliche: %d%n", REPLICAS);
         System.out.printf("Simple Centers: %d, Ride-Sharing Centers: %d%n", SIMPLE_CENTERS, RIDE_CENTERS);
         System.out.printf("Avg. processed jobs per center: %.2f%n", avgProcessed);
-        System.out.printf("Avg. wait time per center:    %.2f%n", avgWaiting);
+        System.out.printf("Avg. response time per center:    %.2f%n", avgWaiting);
     }
 
     @Override
@@ -150,7 +150,7 @@ public class RideSharingSystem implements Sistema {
                 long  jobsSys = 0;
                 for (i = 0; i < SIMPLE_CENTERS+RIDE_CENTERS; i++) {
                     // getAvgWait * getProcessedJobs = area del singolo nodo
-                    areaSys += nodes[i].getAvgWait() * nodes[i].getProcessedJobs();
+                    areaSys += nodes[i].getAvgResponse() * nodes[i].getProcessedJobs();
                     jobsSys += nodes[i].getProcessedJobs();
                 }
                 // Somma dei tempi d'attesa di questo batch sul sistema

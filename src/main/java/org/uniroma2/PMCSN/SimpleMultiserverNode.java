@@ -27,6 +27,7 @@ public class SimpleMultiserverNode implements Node{
     private Sistema system;
 
 
+
     public SimpleMultiserverNode(Sistema system, int index, int servers, Rngs rng) {
         this.SERVERS = servers;
         this.r = rng;
@@ -143,7 +144,7 @@ public class SimpleMultiserverNode implements Node{
 
     public double getNextArrivalTime() {
         r.selectStream(0);
-        double lambda = 0.02;
+        double lambda = 1.65;
 
         if(system instanceof SimpleSystem) {
             switch (centerIndex) {
@@ -175,12 +176,12 @@ public class SimpleMultiserverNode implements Node{
         double a = 2;
         double b = 60;
 
-        alpha = cdfNormal(1.0, 2.0, a);
-        beta = cdfNormal(1.0, 2.0, b);
+        alpha = cdfNormal(20.0, 2.0, a);
+        beta = cdfNormal(20.0, 2.0, b);
 
         double u = uniform(alpha, beta, r);
         //System.out.println("Servizio:" + idfNormal(30.0, 2.0, u));
-        return idfNormal(1.0, 2.0, u);
+        return idfNormal(20.0, 2.0, u);
     }
 
 
@@ -199,7 +200,7 @@ public class SimpleMultiserverNode implements Node{
         return event.get(ARRIVAL).t / index;
     }
 
-    public double getAvgWait() {
+    public double getAvgResponse() {
         return area / index;
     }
 
