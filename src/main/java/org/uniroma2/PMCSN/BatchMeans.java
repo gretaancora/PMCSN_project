@@ -19,4 +19,11 @@ public class BatchMeans {
     public static int getNBatch(){
         return nBatch;
     }
+
+    public static void resetJobInBatch(){
+        nJonInBatch = 0;
+    }
+    public static void resetNBatch(){
+        nBatch = 1;
+    }
 }
