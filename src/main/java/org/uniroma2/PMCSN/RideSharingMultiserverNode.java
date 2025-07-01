@@ -26,6 +26,7 @@ public class RideSharingMultiserverNode implements Node{
     private static final double TIME_WINDOW = 100;
     private static final int SERVER_SMALL = 10;
     private static final int SERVER_MEDIUM = 10;
+    private static final int SERVER_LARGE = 10;
     private static final double P_MATCH_BUSY = 0.6;
     private static final double P_MATCH_IDLE = 0.6;
     private static Sistema system;
@@ -235,11 +236,11 @@ public class RideSharingMultiserverNode implements Node{
             index += event[e].numRichiesteServite;
          //   System.out.println("Index: "+ index);
             number-=event[e].numRichiesteServite;
-            System.out.println("Server: " + e);
-            System.out.println("Capacità del server: " + event[e].capacità);
-            System.out.println("Numero richieste servite: " + event[e].numRichiesteServite);
-            System.out.println("Capacità rimanente del server: " + event[e].capacitàRimanente);
-            System.out.println("Numero posti occupati nel server: " + event[e].postiRichiesti);
+//            System.out.println("Server: " + e);
+//            System.out.println("Capacità del server: " + event[e].capacità);
+//            System.out.println("Numero richieste servite: " + event[e].numRichiesteServite);
+//            System.out.println("Capacità rimanente del server: " + event[e].capacitàRimanente);
+//            System.out.println("Numero posti occupati nel server: " + event[e].postiRichiesti);
             event[e].x = 0;
             event[e].capacitàRimanente = event[e].capacità;
             event[e].numRichiesteServite = 0;

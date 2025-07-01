@@ -13,27 +13,28 @@ public class RideSharingSystem implements Sistema {
     // Numero di repliche da effettuare
     private static final int REPLICAS = 4;
     // Tempo di stop della simulazione (orizzonte finito)
-    private static final double STOP = 2000.0;
+    private static final double STOP = 200000.0;
     // Numero di server configurati per ciascun nodo semplice
     public static final Integer[] SERVERS_SIMPLE = {
             20,
             20,
             20
     };
+    private static final int SERVERS_RIDESHARING = 30;
     private Rngs rng;
-    private static List<Node> nodes = new ArrayList<>(4);
+    private static final List<Node> nodes = new ArrayList<>(4);
 
     public RideSharingSystem(){
 
         rng = new Rngs();
 
-        //istanzia 3 centri semplici
+        //istanza 3 centri semplici
         for (int i = 0; i < SIMPLE_CENTERS; i++) {
             SimpleMultiserverNode center = new SimpleMultiserverNode(this, i, SERVERS_SIMPLE[i], rng);
             nodes.add(center);
         }
 
-        // istanzia centro ride sharing
+        // istanza centro ride sharing
         for (int j = 0; j < RIDE_CENTERS; j++) {
             RideSharingMultiserverNode rideNode = new RideSharingMultiserverNode(rng, this);
             nodes.add(rideNode);
@@ -92,14 +93,101 @@ public class RideSharingSystem implements Sistema {
 
     @Override
     public void runInfiniteSimulation() {
-        throw new UnsupportedOperationException("Infinite simulation not implemented for RideSharingSystem");
-    }
+        final int BATCH_SIZE = 256;   // job per batch
+        final int N_BATCHES  = 64;     // numero totale di batch
 
+        System.out.println("=== SimpleSystem (Infinite Simulation – Batch Means) ===");
+        System.out.printf("Nodi: %d, Batch size: %d, #Batch totali: %d%n",
+                SIMPLE_CENTERS+RIDE_CENTERS, BATCH_SIZE, N_BATCHES);
+
+        // inizializzo RNG una sola volta
+        Rngs rng = new Rngs();
+        rng.plantSeeds(1);
+
+        Node[] nodes = new Node[SIMPLE_CENTERS + RIDE_CENTERS];
+
+        for (int i = 0; i < SIMPLE_CENTERS; i++) {
+            nodes[i] = new SimpleMultiserverNode(this, i, SERVERS_SIMPLE[i], rng);
+        }
+
+        for (int i = 0; i < RIDE_CENTERS; i++) {
+            nodes[SIMPLE_CENTERS + i] = new RideSharingMultiserverNode(rng, this);
+        }
+
+        // Resetto BatchMeans
+        BatchMeans.resetNBatch();
+        BatchMeans.resetJobInBatch();
+
+        List<Double> batchMeans = new ArrayList<>();
+        double lastAreaSys = 0.0;   // area cumulata sistema fino a fine batch precedente
+
+        // Finché non ho raccolto N_BATCHES batch
+        while (BatchMeans.getNBatch() <= N_BATCHES) {
+            // Trovo il prossimo evento fra tutti i nodi
+            double tnext = Double.POSITIVE_INFINITY;
+            int    nextNode = -1;
+            int i;
+            for (i = 0; i < SIMPLE_CENTERS+RIDE_CENTERS; i++) {
+                double tn = nodes[i].peekNextEventTime();
+                if (tn < tnext) {
+                    tnext = tn;
+                    nextNode = i;
+                }
+            }
+
+            // Processa l'evento sul nodo scelto
+            int srv = nodes[nextNode].processNextEvent(tnext);
+
+            // Se è una DEPARTURE (server valido), conto un job nel batch
+            if ((srv >= 1 && nextNode < SIMPLE_CENTERS && srv <= SERVERS_SIMPLE[nextNode]) || (srv >= 1 && nextNode < SIMPLE_CENTERS+RIDE_CENTERS && srv <= SERVERS_RIDESHARING)) {
+                BatchMeans.incrementJobInBatch();
+            }
+
+            // Quando raggiungo BATCH_SIZE job, chiudo il batch
+            if (BatchMeans.getJobInBatch() >= BATCH_SIZE) {
+                // Calcolo l'area cumulata di tutto il sistema
+                double areaSys = 0.0;
+                long  jobsSys = 0;
+                for (i = 0; i < SIMPLE_CENTERS+RIDE_CENTERS; i++) {
+                    // getAvgWait * getProcessedJobs = area del singolo nodo
+                    areaSys += nodes[i].getAvgWait() * nodes[i].getProcessedJobs();
+                    jobsSys += nodes[i].getProcessedJobs();
+                }
+                // Somma dei tempi d'attesa di questo batch sul sistema
+                double batchSum = areaSys - lastAreaSys;
+                double meanWait = batchSum / BATCH_SIZE;
+                batchMeans.add(meanWait);
+
+                System.out.printf("Batch %2d chiuso: mean wait sistema = %.4f%n",
+                        BatchMeans.getNBatch(), meanWait);
+
+                // Preparo il batch successivo
+                lastAreaSys = areaSys;
+                BatchMeans.incrementNBatch();
+                BatchMeans.resetJobInBatch();
+            }
+        }
+
+        // Calcolo media e varianza dei batch-means
+        double meanOfMeans = batchMeans.stream()
+                .mapToDouble(d -> d)
+                .average()
+                .orElse(0.0);
+        double var = batchMeans.stream()
+                .mapToDouble(d -> Math.pow(d - meanOfMeans, 2))
+                .sum()
+                / (batchMeans.size() - 1);
+
+        System.out.println("\n=== Summary Infinite Simulation ===");
+        System.out.printf("Totale batch: %d%n", N_BATCHES);
+        System.out.printf("Avg. of batch-means wait (sistema):     %.4f%n", meanOfMeans);
+        System.out.printf("Avg. of batch-means variance (sistema): %.4f%n", var);
+    }
 
     public void generateFeedback(MsqEvent event) {
         if (event.postiRichiesti < 4) {
-            nodes.get(0).setArrivalEvent(event);
-            nodes.get(0).addNumber();
+            nodes.getFirst().setArrivalEvent(event);
+            nodes.getFirst().addNumber();
         } else if (event.postiRichiesti == 4){
             nodes.get(1).setArrivalEvent(event);
             nodes.get(1).addNumber();
