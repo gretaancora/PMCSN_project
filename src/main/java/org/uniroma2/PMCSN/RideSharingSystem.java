@@ -29,7 +29,7 @@ public class RideSharingSystem implements Sistema {
 
         //istanzia 3 centri semplici
         for (int i = 0; i < SIMPLE_CENTERS; i++) {
-            SimpleMultiserverNode center = new SimpleMultiserverNode(SERVERS_SIMPLE[i], rng);
+            SimpleMultiserverNode center = new SimpleMultiserverNode(i, SERVERS_SIMPLE[i], rng);
             nodes.add(center);
         }
 

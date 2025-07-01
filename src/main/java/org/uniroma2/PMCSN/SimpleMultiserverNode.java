@@ -20,8 +20,13 @@ public class SimpleMultiserverNode implements Node{
     private double currentTime;
     private Rngs r;
     private static double P_EXIT = 0.2;
+    private static double P_SMALL = 0.6;
+    private static double P_MEDIUM = 0.2;
+    private static double P_LARGE = 0.2;
+    private int centerIndex;
 
-    public SimpleMultiserverNode(int servers, Rngs rng) {
+
+    public SimpleMultiserverNode(int index, int servers, Rngs rng) {
         this.SERVERS = servers;
         this.r = rng;
         this.sarrival = 0.0;
@@ -29,6 +34,7 @@ public class SimpleMultiserverNode implements Node{
         this.number = 0;
         this.index = 0;
         this.area = 0.0;
+        this.centerIndex = index;
 
         // eventi e somme
         event = new ArrayList<>();
@@ -135,10 +141,19 @@ public class SimpleMultiserverNode implements Node{
 
     public double getNextArrivalTime() {
         r.selectStream(0);
-        sarrival += exponential(20, r);
+        double lambda = 0;
+
+        switch (centerIndex){
+            case 0 -> lambda = P_SMALL * 20;
+            case 1 -> lambda = P_MEDIUM * 20;
+            case 2 -> lambda = P_LARGE * 20;
+            default -> System.out.println("Centro inesistente!");
+        }
+        sarrival += exponential(lambda, r);
         //System.out.println("Arrivo a:" + sarrival);
         return sarrival;
     }
+
 
     //dovrebbe restituire valore gaussiana troncata tra a e b
     public double getServiceTime() {

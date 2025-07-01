@@ -74,6 +74,7 @@ public class RideSharingMultiserverNode implements Node{
         // schedulo il primo arrivo “esterno”
         event[ARRIVAL].t = getNextArrivalTime();
         event[ARRIVAL].x = 1;
+        event[ARRIVAL].postiRichiesti = getNumPosti();
     }
 
     /**
@@ -115,6 +116,7 @@ public class RideSharingMultiserverNode implements Node{
                                 / (event[i].numRichiesteServite + 1);
                         event[i].numRichiesteServite++;
                         event[i].capacitàRimanente -= req.postiRichiesti;
+                        event[i].postiRichiesti += req.postiRichiesti;
 
                         matched = true;
 
@@ -134,6 +136,7 @@ public class RideSharingMultiserverNode implements Node{
                             event[i].numRichiesteServite++;
                             event[i].x = 1;
                             event[i].capacitàRimanente -= req.postiRichiesti;
+                            event[i].postiRichiesti += req.postiRichiesti;
 
                             matched = true;
 
@@ -194,6 +197,7 @@ public class RideSharingMultiserverNode implements Node{
             number++;
             // programma il prossimo ARRIVAL esterno
             event[ARRIVAL].t = getNextArrivalTime();
+            event[ARRIVAL].postiRichiesti = getNumPosti();
             pendingArrivals.add(event[ARRIVAL]);
 
             int i = 0;
@@ -231,10 +235,15 @@ public class RideSharingMultiserverNode implements Node{
             index += event[e].numRichiesteServite;
          //   System.out.println("Index: "+ index);
             number-=event[e].numRichiesteServite;
+            System.out.println("Server: " + e);
+            System.out.println("Capacità del server: " + event[e].capacità);
             System.out.println("Numero richieste servite: " + event[e].numRichiesteServite);
+            System.out.println("Capacità rimanente del server: " + event[e].capacitàRimanente);
+            System.out.println("Numero posti occupati nel server: " + event[e].postiRichiesti);
             event[e].x = 0;
             event[e].capacitàRimanente = event[e].capacità;
             event[e].numRichiesteServite = 0;
+            event[e].postiRichiesti = 0;
         }
         return -1;
     }
