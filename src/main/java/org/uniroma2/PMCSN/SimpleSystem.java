@@ -6,7 +6,7 @@ public class SimpleSystem implements Sistema{
     // Numero di nodi nel sistema
     private static final int NODES = 3;
     // Numero di repliche da effettuare
-    private static final int REPLICAS = 1;
+    private static final int REPLICAS = 4;
     // Tempo di stop della simulazione (orizzonte finito)
     private static final double STOP = 2000.0;
     // Numero di server configurati per ciascun nodo
