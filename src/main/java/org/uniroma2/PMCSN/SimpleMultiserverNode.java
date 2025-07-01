@@ -24,9 +24,10 @@ public class SimpleMultiserverNode implements Node{
     private static double P_MEDIUM = 0.2;
     private static double P_LARGE = 0.2;
     private int centerIndex;
+    private Sistema system;
 
 
-    public SimpleMultiserverNode(int index, int servers, Rngs rng) {
+    public SimpleMultiserverNode(Sistema system, int index, int servers, Rngs rng) {
         this.SERVERS = servers;
         this.r = rng;
         this.sarrival = 0.0;
@@ -35,6 +36,7 @@ public class SimpleMultiserverNode implements Node{
         this.index = 0;
         this.area = 0.0;
         this.centerIndex = index;
+        this.system = system;
 
         // eventi e somme
         event = new ArrayList<>();
@@ -141,15 +143,25 @@ public class SimpleMultiserverNode implements Node{
 
     public double getNextArrivalTime() {
         r.selectStream(0);
-        double lambda = 0;
+        double lambda = 0.02;
 
-        switch (centerIndex){
-            case 0 -> lambda = P_SMALL * 20;
-            case 1 -> lambda = P_MEDIUM * 20;
-            case 2 -> lambda = P_LARGE * 20;
-            default -> System.out.println("Centro inesistente!");
+        if(system instanceof SimpleSystem) {
+            switch (centerIndex) {
+                case 0 -> lambda *= P_SMALL;
+                case 1 -> lambda *= P_MEDIUM;
+                case 2 -> lambda *= P_LARGE;
+                default -> System.out.println("Centro inesistente!");
+            }
+        }else{
+            switch (centerIndex) {
+                case 0 -> lambda *= P_SMALL * 0.7;
+                case 1 -> lambda *= P_MEDIUM * 0.7;
+                case 2 -> lambda *= P_LARGE * 0.7;
+                default -> System.out.println("Centro inesistente!");
+            }
         }
-        sarrival += exponential(lambda, r);
+
+        sarrival += exponential(1/lambda, r);
         //System.out.println("Arrivo a:" + sarrival);
         return sarrival;
     }

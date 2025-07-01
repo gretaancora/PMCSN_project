@@ -270,7 +270,8 @@ public class RideSharingMultiserverNode implements Node{
 
     public double getNextArrivalTime() {
         r.selectStream(0);
-        sarrival += exponential(20, r);
+        double lambda = 0.02*0.3;
+        sarrival += exponential(1/lambda, r);
         return sarrival;
     }
 

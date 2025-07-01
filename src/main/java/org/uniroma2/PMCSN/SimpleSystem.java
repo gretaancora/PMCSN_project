@@ -30,7 +30,7 @@ public class SimpleSystem implements Sistema{
             for (int i = 0; i < NODES; i++) {
 
                 // Crea il nodo multiserver con SERVERS[i] server
-                SimpleMultiserverNode node = new SimpleMultiserverNode(i, SERVERS[i], rng);
+                SimpleMultiserverNode node = new SimpleMultiserverNode(this, i, SERVERS[i], rng);
                 // Esegui eventi finché il prossimo evento è prima di STOP
                 while ((tnext = node.peekNextEventTime()) < STOP) {
                     node.processNextEvent(tnext);
