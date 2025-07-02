@@ -28,6 +28,7 @@ public class SimpleMultiserverNode implements Node{
     private int centerIndex;
     private Sistema system;
     private final ReplicationStats stats = new ReplicationStats();
+    private double lastTotalService = 0.0;
 
 
 
@@ -41,6 +42,7 @@ public class SimpleMultiserverNode implements Node{
         this.area = 0.0;
         this.centerIndex = index;
         this.system = system;
+        this.lastTotalService = 0.0;
 
         // eventi e somme
         event = new ArrayList<>();
@@ -233,8 +235,10 @@ public class SimpleMultiserverNode implements Node{
     }
 
     public double getAvgWaitingInQueue() {
-        return queueJobs > 0 ? areaQueue / queueJobs : 0.0;
+        long totalJobs = getProcessedJobs();
+        return totalJobs > 0 ? areaQueue / totalJobs : 0.0;
     }
+
 
     public double getAvgNumInQueue() {
         return areaQueue / currentTime;
@@ -279,5 +283,33 @@ public class SimpleMultiserverNode implements Node{
     public ReplicationStats getStats() {
         return stats;
     }
+
+    /**
+     * Restituisce il servizio erogato (somma di sum[s].service) da
+     * quando è stato registrato l'ultimo batch, e aggiorna il marcatore.
+     */
+    public double getIncrementalServiceTime() {
+        // calcola il servizio totale corrente:
+        double totalService = 0.0;
+        for (int s = 1; s <= SERVERS; s++) {
+            totalService += sum[s].service;
+        }
+        // differenza rispetto a quando è iniziato l'ultimo batch
+        double delta = totalService - lastTotalService;
+        // aggiorna il marcatore per il prossimo batch
+        lastTotalService = totalService;
+        return delta;
+    }
+
+    private long lastProcessedJobs = 0;
+
+    public long getLastProcessedJobs() {
+        return lastProcessedJobs;
+    }
+
+    public void setLastProcessedJobs(long value) {
+        this.lastProcessedJobs = value;
+    }
+
 
 }

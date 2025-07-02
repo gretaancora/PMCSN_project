@@ -2,6 +2,7 @@ package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class SimpleSystem implements Sistema{
@@ -111,7 +112,12 @@ public class SimpleSystem implements Sistema{
 
         // buffer per aree accumulate (per batch) di nodo e sistema
         double[] lastAreaNode = new double[NODES];
+        double[] lastAreaQueueNode  = new double[NODES];
+        long[]   lastQueueJobsNode  = new long[NODES];
         double   lastAreaSys  = 0.0;
+        double   lastAreaQueueSys   = 0.0;
+        double   startTimeBatch = 0.0;      // ADDED: inizio del batch
+        double   endTimeBatch   = 0.0;      // ADDED: fine del batch
 
         int batchCount  = 0;
         int jobsInBatch = 0;
@@ -128,11 +134,21 @@ public class SimpleSystem implements Sistema{
                 }
             }
             int srv = nodesLoc.get(chosen).processNextEvent(tnext);
-            if (srv >= 0) jobsInBatch++;
+            if (srv >= 0) {
+                if (jobsInBatch == 0) {
+                    startTimeBatch = tnext;          // ADDED: segno inizio batch
+                }
+                jobsInBatch++;
+                endTimeBatch = tnext;               // ADDED: aggiorno fine batch
+            }
 
             if (jobsInBatch >= BATCH_SIZE) {
                 // Per ogni nodo calcolo il batch‐mean e lo inserisco
                 double areaSys = 0.0;
+                double areaQueueSys = 0.0;                        // ADDED: area di coda totale in questo batch
+                long   queueJobsSys = 0;
+                long jobsProcessedInBatch = 0;
+
                 for (int i = 0; i < NODES; i++) {
                     SimpleMultiserverNode node = nodesLoc.get(i);
                     double areaNode = node.getAvgResponse() * node.getProcessedJobs();
@@ -140,36 +156,72 @@ public class SimpleSystem implements Sistema{
                     nodeStats[i].insert(batchMeanNode, batchMeanNode, batchMeanNode, batchMeanNode, batchMeanNode);
                     lastAreaNode[i] = areaNode;
                     areaSys += areaNode;
+                    jobsProcessedInBatch += node.getProcessedJobs() - node.getLastProcessedJobs();
+                    node.setLastProcessedJobs(node.getProcessedJobs()); // <-- Devi esporre questi metodi nella classe SimpleMultiserverNode
+
+
+                    // --- ADDED: calcolo area coda e job in coda nel batch per nodo ---
+                    double thisAreaQueue = node.getAreaQueue();
+                    long   thisQueueJobs = node.getQueueJobs();
+                    double deltaAreaQueue = thisAreaQueue - lastAreaQueueNode[i];
+                    long   deltaJobsQueue = thisQueueJobs - lastQueueJobsNode[i];
+                    areaQueueSys += deltaAreaQueue;
+                    queueJobsSys += deltaJobsQueue;
+                    lastAreaQueueNode[i] = thisAreaQueue;
+                    lastQueueJobsNode[i]   = thisQueueJobs;
                 }
+
                 // Calcolo batch-mean di sistema e lo inserisco
-                double batchMeanSys = (areaSys - lastAreaSys) / (BATCH_SIZE * NODES);
+                double batchMeanSys = jobsProcessedInBatch > 0
+                        ? (areaSys - lastAreaSys) / jobsProcessedInBatch
+                        : 0.0;
+
                 // Popolazione media di sistema per batch
-                double ensSys = areaSys / ((batchCount + 1) * NODES);
+                double deltaAreaSys = areaSys - lastAreaSys;           // area nel solo batch
+                double deltaTime    = endTimeBatch - startTimeBatch;   // durata del batch
+                double ensBatch     = deltaAreaSys / deltaTime;       // ENs corretto
 
+                double batchMeanQueue = queueJobsSys > 0
+                        ? (areaQueueSys - lastAreaQueueSys) / queueJobsSys
+                        : 0.0;                             // tempo medio di attesa in coda
+                double avgNumQueue    = (areaQueueSys - lastAreaQueueSys) / (BATCH_SIZE * NODES);
+
+                // 4) *** MODIFIED: CALCOLO DI RHO ***
+                // calcolo tempo totale di servizio erogato nel batch
+                double serviceTimeBatch = 0.0;                         // ADDED
+                for (SimpleMultiserverNode node : nodesLoc) {         // ADDED
+                    serviceTimeBatch += node.getIncrementalServiceTime(); // ADDED: devi esporre questo metodo
+                }
+                int totalServers = Arrays.stream(SERVERS).mapToInt(Integer::intValue).sum(); // ADDED
+                double rhoBatch = (serviceTimeBatch / deltaTime) / totalServers; // ADDED
+
+                // 5) inserisco in systemStats
                 systemStats.insert(
-                        batchMeanSys,    // ETs
-                        ensSys,          // ENS
-                        batchMeanSys,    // ETq (se lo interpreti come risposta)
-                        ensSys,          // ENq
-                        batchMeanSys     // Rho proxy
+                        batchMeanSys,  // ETs
+                        ensBatch,      // ENs  <-- MODIFIED
+                        batchMeanQueue,// ETq
+                        avgNumQueue,   // ENq
+                        rhoBatch       // Rho  <-- MODIFIED
                 );
-                lastAreaSys = areaSys;
 
+                // 6) SCRITTURA CSV se vuoi
                 FileCSVGenerator.writeRepData(
-                        false,          // isFinite = false
-                        1,              // seed fisso (puoi modificare se vuoi)
-                        -1,             // centerIndex = -1 per indicare "sistema"
-                        batchCount + 1, // runNumber = numero batch
-                        STOP,
+                        false,                     // isFinite?
+                        1,                         // seed
+                        -1,                        // system
+                        batchCount + 1,            // runNumber
+                        endTimeBatch,              // time di chiusura batch
                         batchMeanSys,
-                        ensSys,
-                        batchMeanSys,
-                        ensSys,
-                        batchMeanSys
+                        ensBatch,
+                        batchMeanQueue,
+                        avgNumQueue,
+                        rhoBatch
                 );
 
-                // preparo il batch successivo
-                jobsInBatch = 0;
+                // 7) reset per il prossimo batch
+                lastAreaSys      = areaSys;
+                lastAreaQueueSys = areaQueueSys;
+                jobsInBatch      = 0;
                 batchCount++;
             }
         }
