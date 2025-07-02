@@ -15,5 +15,9 @@ public interface Node {
     int findOne();
     void setArrivalEvent(MsqEvent event);
     void addNumber();
+    void collectStatistics(int replicaIndex);
+    void printFinalStats();  // calcola medie + σ e stampa a video
 
+
+    ReplicationStats getStats();
 }

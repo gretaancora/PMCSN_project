@@ -106,6 +106,7 @@ public class RideSharingMultiserverNode implements Node{
                 boolean matched = false;
 
                 // 1) server attivi
+                r.selectStream(3); // stream 3 per match con server attivi
                 for (int i = 1; i <= SERVERS && !matched; i++) {
                     if (event[i].x == 1
                             && event[i].capacitàRimanente >= req.postiRichiesti
@@ -126,6 +127,7 @@ public class RideSharingMultiserverNode implements Node{
 
                 // 2) server inattivi
                 if (!matched) {
+                    r.selectStream(4); // stream 4 per match con server inattivi
                     for (int i = 1; i <= SERVERS && !matched; i++) {
                         if (event[i].x == 0
                                 && event[i].capacitàRimanente >= req.postiRichiesti && r.random() < P_MATCH_IDLE) {
@@ -166,8 +168,6 @@ public class RideSharingMultiserverNode implements Node{
     }
 
 
-
-
     @Override
     public void setArrivalEvent(MsqEvent event) {
         //non utilizzato in questo tipo di centro
@@ -176,6 +176,21 @@ public class RideSharingMultiserverNode implements Node{
     @Override
     public void addNumber() {
         //non utilizzato in questo tipo di centro
+    }
+
+    @Override
+    public void collectStatistics(int replicaIndex) {
+
+    }
+
+    @Override
+    public void printFinalStats() {
+
+    }
+
+    @Override
+    public ReplicationStats getStats() {
+        return null;
     }
 
 
@@ -211,11 +226,13 @@ public class RideSharingMultiserverNode implements Node{
                     pendingArrivals.remove(i);
                     break;
                 }
+                // Seleziono uno stream dedicato per probabilità di perdita/feedback
+                r.selectStream(5);
                 double pLoss = r.random();
                 if (pLoss < P_EXIT) {
                     pendingArrivals.remove(i);
                     return -1;
-                } else if (pLoss < FEEDBACK) {
+                } else if (pLoss < P_EXIT + FEEDBACK) {
                     system.generateFeedback(pendingArrivals.get(i));
                     pendingArrivals.remove(i);
                     return -1;
@@ -226,7 +243,6 @@ public class RideSharingMultiserverNode implements Node{
             }
 
             findOne();
-
 
         } else {
             // DEPARTURE da server e

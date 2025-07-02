@@ -1,148 +1,195 @@
 package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
-
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SimpleSystem implements Sistema{
-    // Numero di nodi nel sistema
-    private static final int NODES = 3;
-    // Numero di repliche da effettuare
+    private static final int NODES    = 3;
     private static final int REPLICAS = 4;
-    // Tempo di stop della simulazione (orizzonte finito)
-    private static final double STOP = 1000.0;
-    // Numero di server configurati per ciascun nodo
-    public static final Integer[] SERVERS = {
-            33,
-            11,
-            11
-    };
+    private static final double STOP  = 1000.0;
+    public static final Integer[] SERVERS = {33, 11, 11};
+
+    // Statistiche per ogni nodo
+    private final ReplicationStats[] nodeStats   = new ReplicationStats[NODES];
+    // Statistiche globali del sistema
+    private final ReplicationStats   systemStats = new ReplicationStats();
+
+    public SimpleSystem() {
+        for (int i = 0; i < NODES; i++) {
+            nodeStats[i] = new ReplicationStats();
+        }
+    }
 
     @Override
     public void runFiniteSimulation() {
-        double totalProcessed = 0.0;
-        double totalResponse = 0.0;
-        double tnext;
-
         for (int rep = 0; rep < REPLICAS; rep++) {
-            // Inizializza generatore RNG per ogni replica
             Rngs rng = new Rngs();
-            rng.plantSeeds(rep + 1); // imposta seed della replica
+            rng.plantSeeds(rep + 1);
 
+            double sumAreaSys      = 0.0;
+            long   sumJobsSys      = 0;
+            double sumAreaQueueSys = 0.0;
+            long   sumQueueJobsSys = 0;
+
+            // Simulo nodo per nodo
             for (int i = 0; i < NODES; i++) {
-
-                // Crea il nodo multiserver con SERVERS[i] server
                 SimpleMultiserverNode node = new SimpleMultiserverNode(this, i, SERVERS[i], rng);
-                // Esegui eventi finché il prossimo evento è prima di STOP
+                double tnext;
                 while ((tnext = node.peekNextEventTime()) < STOP) {
                     node.processNextEvent(tnext);
                 }
+                // raccolta stats nodo
+                node.collectStatistics(rep);
 
-                // Raccogli statistiche
-                totalProcessed += node.getProcessedJobs();
-                totalResponse += node.getAvgResponse();
+                // estraggo le 5 metriche dal nodo
+                double eTs = node.getAvgResponse();
+                double eNs = node.getAvgNumInNode();
+                double eTq = node.getAvgWaitingInQueue();
+                double eNq = node.getAvgNumInQueue();
+                double rho = node.getUtilization();
+
+                // inserisco nelle stats per quel nodo
+                nodeStats[i].insert(eTs, eNs, eTq, eNq, rho);
+
+                sumAreaSys      += node.getAvgResponse() * node.getProcessedJobs();  //accumulo i contributi per le statistiche globali
+                sumJobsSys      += node.getProcessedJobs();
+                sumAreaQueueSys += node.getAreaQueue();
+                sumQueueJobsSys += node.getQueueJobs();
             }
+
+            // Calcolo metriche di sistema per questa replica
+            double systemETs = sumAreaSys / sumJobsSys;
+            double systemENS = sumAreaSys / STOP;
+            double systemETq = sumQueueJobsSys > 0
+                    ? sumAreaQueueSys / sumQueueJobsSys
+                    : 0.0;
+            double systemENq = sumAreaQueueSys / STOP;
+            double systemRho = computeSystemUtilization();
+
+            // inserisco nelle stats globali
+            systemStats.insert(systemETs, systemENS, systemETq, systemENq, systemRho);
+
+            FileCSVGenerator.writeRepData(
+                    true,           // isFinite = true
+                    rep + 1,        // seed della replica (oppure usa il seed corretto)
+                    -1,             // centerIndex = -1 per indicare "sistema"
+                    rep + 1,        // runNumber = numero replica
+                    STOP,           // tempo simulazione
+                    systemETs,
+                    systemENS,
+                    systemETq,
+                    systemENq,
+                    systemRho
+            );
+
         }
 
-        // Stampa risultati medi
-        double avgProcessedPerNode = totalProcessed / (REPLICAS * NODES);
-        double avgResponsePerNode = totalResponse / (REPLICAS * NODES);
-
-        System.out.println("=== SimpleSystem (Finite Simulation) ===");
-        System.out.printf("Repliche: %d, Nodi per replica: %d%n", REPLICAS, NODES);
-        System.out.printf("Avg. processed jobs per node: %.2f%n", avgProcessedPerNode);
-        System.out.printf("Avg. response time per node:    %.2f%n", avgResponsePerNode);
+        // Stampo i risultati
+        System.out.println("=== Finite Simulation – Node Stats ===");
+        for (int i = 0; i < NODES; i++) {
+            nodeStats[i].printFinalStats("Node " + i);
+        }
+        System.out.println("=== Finite Simulation – System Stats ===");
+        systemStats.printFinalStats("SYSTEM");
     }
-
 
     @Override
     public void runInfiniteSimulation() {
-        final int BATCH_SIZE = 1000;   // job per batch
-        final int N_BATCHES  = 30;     // numero totale di batch
+        final int BATCH_SIZE = 1000;
+        final int N_BATCHES  = 30;
 
-        System.out.println("=== SimpleSystem (Infinite Simulation – Batch Means) ===");
-        System.out.printf("Nodi: %d, Batch size: %d, #Batch totali: %d%n",
-                NODES, BATCH_SIZE, N_BATCHES);
-
-        // inizializzo RNG una sola volta
+        System.out.println("=== Infinite Simulation – Batch Means ===");
         Rngs rng = new Rngs();
         rng.plantSeeds(1);
 
-        // Istanzio tutti i nodi
-        SimpleMultiserverNode[] nodes = new SimpleMultiserverNode[NODES];
+        // Inizializzo i nodi
+        List<SimpleMultiserverNode> nodesLoc = new ArrayList<>();
         for (int i = 0; i < NODES; i++) {
-            nodes[i] = new SimpleMultiserverNode(this, i, SERVERS[i], rng);
+            nodesLoc.add(new SimpleMultiserverNode(this, i, SERVERS[i], rng));
         }
 
-        // Resetto BatchMeans
-        BatchMeans.resetNBatch();
-        BatchMeans.resetJobInBatch();
+        // buffer per aree accumulate (per batch) di nodo e sistema
+        double[] lastAreaNode = new double[NODES];
+        double   lastAreaSys  = 0.0;
 
-        List<Double> batchMeans = new ArrayList<>();
-        double lastAreaSys = 0.0;   // area cumulata sistema fino a fine batch precedente
+        int batchCount  = 0;
+        int jobsInBatch = 0;
 
-        // Finché non ho raccolto N_BATCHES batch
-        while (BatchMeans.getNBatch() <= N_BATCHES) {
-            // Trovo il prossimo evento fra tutti i nodi
+        while (batchCount < N_BATCHES) {
+            // Trovo il prossimo evento in tutto il sistema
             double tnext = Double.POSITIVE_INFINITY;
-            int    nextNode = -1;
+            int chosen = -1;
             for (int i = 0; i < NODES; i++) {
-                double tn = nodes[i].peekNextEventTime();
-                if (tn < tnext) {
-                    tnext = tn;
-                    nextNode = i;
+                double t = nodesLoc.get(i).peekNextEventTime();
+                if (t < tnext) {
+                    tnext = t;
+                    chosen = i;
                 }
             }
+            int srv = nodesLoc.get(chosen).processNextEvent(tnext);
+            if (srv >= 0) jobsInBatch++;
 
-            // Processa l'evento sul nodo scelto
-            int srv = nodes[nextNode].processNextEvent(tnext);
-
-            // Se è una DEPARTURE (server valido), conto un job nel batch
-            if (srv >= 1 && srv <= SERVERS[nextNode]) {
-                BatchMeans.incrementJobInBatch();
-            }
-
-            // Quando raggiungo BATCH_SIZE job, chiudo il batch
-            if (BatchMeans.getJobInBatch() >= BATCH_SIZE) {
-                // Calcolo l'area cumulata di tutto il sistema
+            if (jobsInBatch >= BATCH_SIZE) {
+                // Per ogni nodo calcolo il batch‐mean e lo inserisco
                 double areaSys = 0.0;
-                long  jobsSys = 0;
                 for (int i = 0; i < NODES; i++) {
-                    // getAvgWait * getProcessedJobs = area del singolo nodo
-                    areaSys += nodes[i].getAvgResponse() * nodes[i].getProcessedJobs();
-                    jobsSys += nodes[i].getProcessedJobs();
+                    SimpleMultiserverNode node = nodesLoc.get(i);
+                    double areaNode = node.getAvgResponse() * node.getProcessedJobs();
+                    double batchMeanNode = (areaNode - lastAreaNode[i]) / BATCH_SIZE;
+                    nodeStats[i].insert(batchMeanNode, batchMeanNode, batchMeanNode, batchMeanNode, batchMeanNode);
+                    lastAreaNode[i] = areaNode;
+                    areaSys += areaNode;
                 }
-                // Somma dei tempi d'attesa di questo batch sul sistema
-                double batchSum = areaSys - lastAreaSys;
-                double meanResponse = batchSum / BATCH_SIZE;
-                batchMeans.add(meanResponse);
+                // Calcolo batch-mean di sistema e lo inserisco
+                double batchMeanSys = (areaSys - lastAreaSys) / (BATCH_SIZE * NODES);
+                // Popolazione media di sistema per batch
+                double ensSys = areaSys / ((batchCount + 1) * NODES);
 
-                System.out.printf("Batch %2d chiuso: mean wait sistema = %.4f%n",
-                        BatchMeans.getNBatch(), meanResponse);
-
-                // Preparo il batch successivo
+                systemStats.insert(
+                        batchMeanSys,    // ETs
+                        ensSys,          // ENS
+                        batchMeanSys,    // ETq (se lo interpreti come risposta)
+                        ensSys,          // ENq
+                        batchMeanSys     // Rho proxy
+                );
                 lastAreaSys = areaSys;
-                BatchMeans.incrementNBatch();
-                BatchMeans.resetJobInBatch();
+
+                FileCSVGenerator.writeRepData(
+                        false,          // isFinite = false
+                        1,              // seed fisso (puoi modificare se vuoi)
+                        -1,             // centerIndex = -1 per indicare "sistema"
+                        batchCount + 1, // runNumber = numero batch
+                        STOP,
+                        batchMeanSys,
+                        ensSys,
+                        batchMeanSys,
+                        ensSys,
+                        batchMeanSys
+                );
+
+                // preparo il batch successivo
+                jobsInBatch = 0;
+                batchCount++;
             }
         }
 
-        // Calcolo media e varianza dei batch-means
-        double meanOfMeans = batchMeans.stream()
-                .mapToDouble(d -> d)
-                .average()
-                .orElse(0.0);
-        double var = batchMeans.stream()
-                .mapToDouble(d -> Math.pow(d - meanOfMeans, 2))
-                .sum()
-                / (batchMeans.size() - 1);
+        // Stampa nodi e sistema
+        System.out.println("=== Infinite Simulation – Node Stats ===");
+        for (int i = 0; i < NODES; i++) {
+            nodeStats[i].printFinalStats("Node " + i);
+        }
+        System.out.println("=== Infinite Simulation – System Stats ===");
+        systemStats.printFinalStats("SYSTEM");
+    }
 
-        System.out.println("\n=== Summary Infinite Simulation ===");
-        System.out.printf("Totale batch: %d%n", N_BATCHES);
-        System.out.printf("Avg. of batch-means response (sistema):     %.4f%n", meanOfMeans);
-        System.out.printf("Avg. of batch-means variance (sistema): %.4f%n", var);
+    /** Calcola la media delle utilizzazioni registrate in nodeStats */
+    private double computeSystemUtilization() {
+        double sum = 0.0;
+        for (int i = 0; i < NODES; i++) {
+            sum += nodeStats[i].mean(nodeStats[i].getUtilizations());
+        }
+        return sum / NODES;
     }
 
 

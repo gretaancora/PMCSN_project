@@ -17,6 +17,8 @@ public class SimpleMultiserverNode implements Node{
     private long number;        // job totali nel nodo (in servizio + in coda)
     private long index;         // contatore job processati
     private double area;        // integrale del numero in sistema
+    private double areaQueue = 0.0;  // area sotto la curva dei job in coda
+    private long queueJobs = 0;      // numero totale di job che hanno fatto coda
     private double currentTime;
     private Rngs r;
     private static double P_EXIT = 0.2;
@@ -25,6 +27,7 @@ public class SimpleMultiserverNode implements Node{
     private static double P_LARGE = 0.2;
     private int centerIndex;
     private Sistema system;
+    private final ReplicationStats stats = new ReplicationStats();
 
 
 
@@ -84,6 +87,10 @@ public class SimpleMultiserverNode implements Node{
         double tnext = event.get(e).t;
         // integrazione area
         area += (tnext - currentTime) * number;
+        // se c'è coda, incrementa anche areaQueue
+        if (number > SERVERS) {
+            areaQueue += (tnext - currentTime) * (number - SERVERS);
+        }
 //        System.out.println("number: " + number);
 //        System.out.println("tnext: " + tnext);
 //        System.out.println("currenttime: " + currentTime);
@@ -95,9 +102,9 @@ public class SimpleMultiserverNode implements Node{
                 // ARRIVAL “esterno” o da routing
                 number++;
                 // programma il prossimo ARRIVAL esterno
-                event.get(ARRIVAL).t = getNextArrivalTime();
-                //sarrival++;
-                //System.out.println("Arrivo: " + sarrival);
+                event.get(ARRIVAL).t = getNextArrivalTime();      // sarrival++;
+                // System.out.println("Arrivo: " + sarrival);
+                r.selectStream(2); /* stream per generare la p di loss */
                 double pLoss = r.random();
                 if (pLoss < P_EXIT) {
                     number--;
@@ -107,6 +114,7 @@ public class SimpleMultiserverNode implements Node{
 
             int srv = findOne();
             if (srv != -1) {
+                if (number > SERVERS) queueJobs++; // è in coda
                 double svc = getServiceTime();
                 event.get(srv).t = currentTime + svc;
                 event.get(srv).x = 1;
@@ -222,6 +230,54 @@ public class SimpleMultiserverNode implements Node{
 
     public void addNumber() {
         this.number++;
+    }
+
+    public double getAvgWaitingInQueue() {
+        return queueJobs > 0 ? areaQueue / queueJobs : 0.0;
+    }
+
+    public double getAvgNumInQueue() {
+        return areaQueue / currentTime;
+    }
+
+    public double getAreaQueue() {
+        return areaQueue;
+    }
+
+    public long getQueueJobs() {
+        return queueJobs;
+    }
+
+
+    public double getUtilization() {
+        double busyTime = 0.0;
+        for (int s = 1; s <= SERVERS; s++) {
+            busyTime += sum[s].service;
+        }
+        return busyTime / (SERVERS * currentTime);
+    }
+
+
+    @Override
+    public void collectStatistics(int replicaIndex) {
+        double eTs = getAvgResponse();
+        double eNs = getAvgNumInNode();
+        double eTq = getAvgWaitingInQueue();
+        double eNq = getAvgNumInQueue();
+        double rho = getUtilization();
+        stats.insert(eTs, eNs, eTq, eNq, rho);
+    }
+
+
+    @Override
+    public void printFinalStats() {
+        // stampa media ± 95% CI
+        stats.printFinalStats("Node " + centerIndex);
+    }
+
+    @Override
+    public ReplicationStats getStats() {
+        return stats;
     }
 
 }
