@@ -10,23 +10,23 @@ import static org.uniroma2.PMCSN.Libs.Distributions.*;
 public class SimpleMultiserverNode implements Node{
 
     private static final int ARRIVAL = 0;
-    private int SERVERS;
+    private final int SERVERS;
     private double sarrival;    // orario cumulato per gli arrivi
-    private List<MsqEvent> event;   // event[0]=next arrival, [1..S]=server departures
-    private MsqSum[] sum;       // statistiche per ogni server
+    private final List<MsqEvent> event;   // event[0]=next arrival, [1..S]=server departures
+    private final MsqSum[] sum;       // statistiche per ogni server
     private long number;        // job totali nel nodo (in servizio + in coda)
     private long index;         // contatore job processati
     private double area;        // integrale del numero in sistema
     private double areaQueue = 0.0;  // area sotto la curva dei job in coda
     private long queueJobs = 0;      // numero totale di job che hanno fatto coda
     private double currentTime;
-    private Rngs r;
-    private static double P_EXIT = 0.2;
-    private static double P_SMALL = 0.6;
-    private static double P_MEDIUM = 0.2;
-    private static double P_LARGE = 0.2;
-    private int centerIndex;
-    private Sistema system;
+    private final Rngs r;
+    private static final double P_EXIT = 0.2;
+    private static final double P_SMALL = 0.6;
+    private static final double P_MEDIUM = 0.2;
+    private static final double P_LARGE = 0.2;
+    private final int centerIndex;
+    private final Sistema system;
     private final ReplicationStats stats = new ReplicationStats();
     private double lastTotalService = 0.0;
 
