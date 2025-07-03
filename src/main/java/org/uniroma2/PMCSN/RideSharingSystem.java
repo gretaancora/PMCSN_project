@@ -3,7 +3,9 @@ package org.uniroma2.PMCSN;
 import org.uniroma2.PMCSN.Libs.Rngs;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 public class RideSharingSystem implements Sistema {
     // Numero di centri semplici nel sistema
@@ -13,7 +15,7 @@ public class RideSharingSystem implements Sistema {
     // Numero di repliche da effettuare
     private static final int REPLICAS = 4;
     // Tempo di stop della simulazione (orizzonte finito)
-    private static final double STOP = 1000.0;
+    private static final double STOP = 250.0;
     // Numero di server configurati per ciascun nodo semplice
     public static final Integer[] SERVERS_SIMPLE = {
             23,
@@ -43,6 +45,123 @@ public class RideSharingSystem implements Sistema {
 
 
     @Override
+    public void runFiniteSimulation() {
+        final double REPORT_INTERVAL = 20.0;
+        // per convenzione, useremo centerIndex=-1 nei report globali
+        final int SYSTEM_INDEX = -1;
+
+        for (int rep = 0; rep < REPLICAS; rep++) {
+            // 1) Inizializza RNG e resetta stato nodi
+            rng = new Rngs();
+            rng.plantSeeds(rep + 1);
+            for (Node n : nodes) {
+                // Se serve, potresti dover ricreare i nodi qui o resettarli
+                // (dipende da come gestisci lo stato interno).
+            }
+
+            double nextReportTime = REPORT_INTERVAL;               // ← NUOVO
+            double sumAreaSys      = 0.0;  // cumulato area sistema
+            long   sumJobsSys      = 0;    // cumulato job completati
+            double sumAreaQueueSys = 0.0;  // cumulato area coda
+            long   sumQueueJobsSys = 0;    // cumulato queue‐jobs
+
+            // 2) Ciclo di simulazione fino a STOP
+            while (true) {
+                // Trova prossimo evento
+                int    chosenIdx = 0;
+                double tmin      = Double.POSITIVE_INFINITY;
+                for (int i = 0; i < nodes.size(); i++) {
+                    double t = nodes.get(i).peekNextEventTime();
+                    if (t < tmin) {
+                        tmin = t;
+                        chosenIdx = i;
+                    }
+                }
+
+                // Se siamo oltre STOP **e** oltre l’ultimo report, usciamo
+                if (tmin > STOP && nextReportTime > STOP) {
+                    break;
+                }
+
+                // Caso A: il report viene prima del prossimo evento
+                if (nextReportTime <= tmin && nextReportTime <= STOP) {
+                    // ← NUOVO: integra **tutti** i nodi fino a nextReportTime
+                    for (Node n : nodes) {
+                        if (n instanceof SimpleMultiserverNode) {
+                            n.integrateTo(nextReportTime);
+                        } else if (n instanceof RideSharingMultiserverNode) {
+                            n.integrateTo(nextReportTime);
+                        }
+                    }
+
+                    // ← NUOVO: calcolo cumulativo di sistema fino a qui
+                    double cumAreaSys      = 0.0;
+                    long   cumJobsSys      = 0;
+                    double cumAreaQueueSys = 0.0;
+                    long   cumQueueJobsSys = 0;
+                    for (Node n : nodes) {
+                        cumAreaSys      += n.getArea();
+                        cumJobsSys      += n.getProcessedJobs();
+                        cumAreaQueueSys += n.getAreaQueue();
+                        cumQueueJobsSys += n.getQueueJobs();
+                    }
+
+                    double t = nextReportTime;
+                    double cumETs = cumJobsSys  > 0 ? cumAreaSys      / cumJobsSys      : 0.0;
+                    double cumENs = cumAreaSys  / t;
+                    double cumETq = cumQueueJobsSys > 0 ? cumAreaQueueSys / cumQueueJobsSys : 0.0;
+                    double cumENq = cumAreaQueueSys / t;
+                    // global rho: media delle rho dei nodi
+                    double cumRho = 0.0;
+                    for (Node n : nodes) {
+                        cumRho += n.getUtilization();
+                    }
+                    cumRho /= nodes.size();
+
+                    // ← NUOVO: scrive il report globale a intervalli
+                    FileCSVGenerator.writeIntervalData(
+                            true,              // finite
+                            rep + 1,           // seed
+                            SYSTEM_INDEX,      // centerIndex = -1 → sistema
+                            nextReportTime,    // Time
+                            cumETs, cumENs, cumETq, cumENq, cumRho
+                    );
+
+                    nextReportTime += REPORT_INTERVAL;
+                    continue;
+                }
+
+                // Caso B: evento prima di STOP e dei report pendenti
+                if (tmin <= STOP) {
+                    nodes.get(chosenIdx).processNextEvent(tmin);
+                } else {
+                    // nessun altro evento utile
+                    break;
+                }
+            }
+
+            // 3) Dopo STOP, raccogli le statistiche finali per ogni nodo
+            double totalProcessed = 0.0;
+            double totalWaiting   = 0.0;
+            for (Node n : nodes) {
+                totalProcessed += n.getProcessedJobs();
+                totalWaiting   += n.getAvgResponse();
+            }
+
+            // 4) Calcola medie per nodo
+            double avgProcessed = totalProcessed / nodes.size();
+            double avgWaiting   = totalWaiting   / nodes.size();
+
+            // 5) Stampa
+            System.out.println("=== RideSharingSystem (Finite Simulation) ===");
+            System.out.printf("Replica %d/%d%n", rep+1, REPLICAS);
+            System.out.printf("Avg processed jobs per center: %.2f%n", avgProcessed);
+            System.out.printf("Avg response  time per center: %.2f%n", avgWaiting);
+        }
+    }
+
+
+    /*@Override
     public void runFiniteSimulation() {
         double totalProcessed = 0.0;
         double totalWaiting = 0.0;
@@ -89,8 +208,8 @@ public class RideSharingSystem implements Sistema {
         System.out.printf("Simple Centers: %d, Ride-Sharing Centers: %d%n", SIMPLE_CENTERS, RIDE_CENTERS);
         System.out.printf("Avg. processed jobs per center: %.2f%n", avgProcessed);
         System.out.printf("Avg. response time per center:    %.2f%n", avgWaiting);
-    }
-
+    }*/
+/*
     @Override
     public void runInfiniteSimulation() {
         final int BATCH_SIZE = 256;   // job per batch
@@ -183,6 +302,119 @@ public class RideSharingSystem implements Sistema {
         System.out.printf("Avg. of batch-means wait (sistema):     %.4f%n", meanOfMeans);
         System.out.printf("Avg. of batch-means variance (sistema): %.4f%n", var);
     }
+*/
+
+    @Override
+    public void runInfiniteSimulation() {
+        final int BATCH_SIZE = 256;
+        final int N_BATCHES  = 64;
+        final int TOTAL_NODES = SIMPLE_CENTERS + RIDE_CENTERS;
+
+        System.out.println("=== RideSharingSystem (Infinite Simulation – Batch Means) ===");
+        System.out.printf("Nodi: %d (simple=%d, ride=%d), Batch size: %d, #Batch totali: %d%n",
+                TOTAL_NODES, SIMPLE_CENTERS, RIDE_CENTERS, BATCH_SIZE, N_BATCHES);
+
+        // Prepara CSV (header)
+        FileCSVGenerator.writeInfiniteGlobal(0, 0, 0, 0, 0, 0);
+
+        // Inizializza RNG e nodi
+        Rngs rng = new Rngs();
+        rng.plantSeeds(1);
+        List<Node> nodesLoc = new ArrayList<>(TOTAL_NODES);
+        for (int i = 0; i < SIMPLE_CENTERS; i++)
+            nodesLoc.add(new SimpleMultiserverNode(this, i, SERVERS_SIMPLE[i], rng));
+        for (int j = 0; j < RIDE_CENTERS; j++)
+            nodesLoc.add(new RideSharingMultiserverNode(rng, this));
+
+        int   batchCount    = 0;
+        int   completions   = 0;
+        double startBatch   = 0.0, endBatch = 0.0;
+
+        while (batchCount < N_BATCHES) {
+            // 1) Trova prossimo evento
+            double tnext = Double.POSITIVE_INFINITY;
+            Node   chosen = null;
+            for (Node n : nodesLoc) {
+                double t = n.peekNextEventTime();
+                if (t < tnext) {
+                    tnext = t;
+                    chosen = n;
+                }
+            }
+
+            // ← CORRETTO: integra tutti i nodi fino a tnext
+            for (Node n : nodesLoc) {
+                if (n instanceof SimpleMultiserverNode)
+                    n.integrateTo(tnext);
+                else
+                    n.integrateTo(tnext);
+            }
+
+            // 2) Processa l’evento “vincente”
+            int srv = chosen.processNextEvent(tnext);
+            if (srv >= 0) {
+                if (completions == 0) startBatch = tnext; // inizio batch
+                completions++;
+                endBatch = tnext;                         // fine batch
+            }
+
+            // 3) Se chiudo un batch…
+            if (completions >= BATCH_SIZE) {
+                batchCount++;
+
+                // ← CORRETTO: sommo le aree e i job di *tutti* i nodi
+                double totalArea     = 0.0;
+                double totalQueueA   = 0.0;
+                long   totalJobs     = 0;
+                long   totalQueueJobs= 0;
+                for (Node n : nodesLoc) {
+                    totalArea      += n.getArea();         // area integrata per nodo
+                    totalQueueA    += n.getAreaQueue();
+                    totalJobs      += n.getProcessedJobs();
+                    totalQueueJobs += n.getQueueJobs();
+                }
+
+                double totalTime = endBatch;                          // ← FIX: tempo dall'inizio al termine di questo batch
+
+                // metriche cumulative corrette:
+                double cumETs = totalJobs   > 0      ? totalArea   / totalJobs   : 0.0;
+                double cumENs = totalTime    > 0      ? totalArea   / totalTime   : 0.0;  // ← FIX
+                double cumETq = totalQueueJobs > 0    ? totalQueueA / totalQueueJobs : 0.0;
+                double cumENq = totalTime    > 0      ? totalQueueA / totalTime   : 0.0;  // ← FIX
+
+                // utilizzo cumulativo
+                double servInc = 0.0;
+                for (Node n : nodesLoc) {
+                    servInc += n.getIncrementalServiceTime();
+                }
+                int totalServers = Arrays.stream(SERVERS_SIMPLE).mapToInt(x->x).sum()
+                        + RIDE_CENTERS * RideSharingMultiserverNode.getNumServersPerRide();
+
+                double cumRho = totalTime > 0
+                        ? (servInc / totalTime) / totalServers
+                        : 0.0;  // ← FIX
+
+                // Scrivo il cumulativo su CSV
+                FileCSVGenerator.writeInfiniteGlobal(
+                        batchCount,
+                        cumETs,
+                        cumENs,
+                        cumETq,
+                        cumENq,
+                        cumRho
+                );
+
+                // Reset per il prossimo batch
+                completions = 0;
+            }
+        }
+
+        System.out.println("=== Infinite Simulation – Fine ===");
+    }
+
+
+
+
 
     public void generateFeedback(MsqEvent event) {
         if (event.postiRichiesti < 4) {
@@ -196,4 +428,6 @@ public class RideSharingSystem implements Sistema {
             nodes.get(2).addNumber();
         }
     }
+
+
 }

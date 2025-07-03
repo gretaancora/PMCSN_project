@@ -30,6 +30,10 @@ public class RideSharingMultiserverNode implements Node{
     private static final double P_MATCH_BUSY = 0.6;
     private static final double P_MATCH_IDLE = 0.6;
     private static Sistema system;
+    private double areaQueue = 0.0;  // area sotto la curva dei job in coda
+    private double lastTotalService = 0.0;
+    private long queueJobs = 0;      // numero totale di job che hanno fatto coda
+
 
 
     private static List<MsqEvent> pendingArrivals = new ArrayList<MsqEvent>();
@@ -42,6 +46,7 @@ public class RideSharingMultiserverNode implements Node{
         this.number = 0;
         this.index = 0;
         this.area = 0.0;
+        this.lastTotalService = 0.0;
         RideSharingMultiserverNode.system = system;
 
         // eventi e somme
@@ -76,6 +81,10 @@ public class RideSharingMultiserverNode implements Node{
         event[ARRIVAL].t = getNextArrivalTime();
         event[ARRIVAL].x = 1;
         event[ARRIVAL].postiRichiesti = getNumPosti();
+    }
+
+    public static int getNumServersPerRide() {
+        return SERVERS;
     }
 
     /**
@@ -353,4 +362,71 @@ public class RideSharingMultiserverNode implements Node{
     public long getProcessedJobs() {
         return index;
     }
+
+    public double getAreaQueue() {
+        return areaQueue;
+    }
+
+    /**
+     * Restituisce il servizio erogato (somma di sum[s].service) da
+     * quando è stato registrato l'ultimo batch, e aggiorna il marcatore.
+     */
+    public double getIncrementalServiceTime() {
+        // calcola il servizio totale corrente:
+        double totalService = 0.0;
+        for (int s = 1; s <= SERVERS; s++) {
+            totalService += sum[s].service;
+        }
+        // differenza rispetto a quando è iniziato l'ultimo batch
+        double delta = totalService - lastTotalService;
+        // aggiorna il marcatore per il prossimo batch
+        lastTotalService = totalService;
+        return delta;
+    }
+
+    public long getQueueJobs() {
+        return queueJobs;
+    }
+
+    /**
+     * Integra le aree fino al tempo t (t ≥ currentTime), senza generare alcun evento.
+     */
+    public void integrateTo(double t) {
+        if (t <= currentTime) return;
+        double dt = t - currentTime;
+        // integrale numero in sistema
+        area += dt * number;
+        // integrale numero in coda
+        if (number > SERVERS) {
+            areaQueue += dt * (number - SERVERS);
+        }
+        currentTime = t;
+    }
+
+    /**
+     * Restituisce l’area sotto la curva del numero in sistema
+     */
+    public double getArea() {
+        return area;
+    }
+
+    @Override
+    public double getUtilization() {
+        // Somma del tempo di servizio erogato da ciascun server
+        double busyTime = 0.0;
+        for (int s = 1; s <= SERVERS; s++) {
+            busyTime += sum[s].service;
+        }
+        // Capacità totale di posti (seat‐time per unità di tempo)
+        int totalSeats = SERVER_SMALL * 3
+                + SERVER_MEDIUM * 4
+                + SERVER_LARGE * 8;
+        // Utilizzazione = busySeatTime / (seatTime disponibile)
+        // seatTime disponibile = totalSeats * currentTime
+        return currentTime > 0.0
+                ? busyTime / (totalSeats * currentTime)
+                : 0.0;
+    }
+
+
 }

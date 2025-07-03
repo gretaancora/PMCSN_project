@@ -1,9 +1,12 @@
 package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 public class SimpleSystem implements Sistema{
     private static final int NODES    = 3;
@@ -45,9 +48,6 @@ public class SimpleSystem implements Sistema{
                 node.setLastQueueJobsSnapshot(0);
 
 
-//                double tnext;
-
-
                 while (true) {
                     double tnext = node.peekNextEventTime();
 
@@ -56,44 +56,6 @@ public class SimpleSystem implements Sistema{
                         break;
                     }
 
-                    // caso A: il report cade prima del prossimo evento
-                  /*  if (nextReportTime <= tnext && nextReportTime <= STOP) {
-                        // 1) integra fino a t = nextReportTime
-                        node.integrateTo(nextReportTime);
-
-                        // 2) calcola i delta sull’esatto intervallo di 20 unità
-                        double deltaArea  = node.getArea()      - node.getLastAreaSnapshot();
-                        long   deltaJobs  = node.getProcessedJobs() - node.getLastProcessedSnapshot();
-                        double deltaQArea = node.getAreaQueue() - node.getLastQueueAreaSnapshot();
-                        long   deltaQJobs = node.getQueueJobs() - node.getLastQueueJobsSnapshot();
-                        double intervalLength = 200.0;
-
-                        double eTs = deltaJobs > 0 ? deltaArea / deltaJobs : 0.0;
-                        double eNs = deltaArea / intervalLength;
-                        double eTq = deltaQJobs > 0 ? deltaQArea / deltaQJobs : 0.0;
-                        double eNq = deltaQArea / intervalLength;
-                        double serviceInterval = node.getIncrementalServiceTime();
-                        double rho = (serviceInterval / intervalLength) / SERVERS[i];
-
-                        // 3) scrivi su CSV
-                        FileCSVGenerator.writeIntervalData(
-                                true,            // finite
-                                rep + 1,         // seed
-                                i,               // centro
-                                nextReportTime,  // istante esatto
-                                eTs, eNs, eTq, eNq, rho
-                        );
-
-                        // 4) aggiorna i marker
-                        node.setLastAreaSnapshot(node.getArea());
-                        node.setLastProcessedSnapshot(node.getProcessedJobs());
-                        node.setLastQueueAreaSnapshot(node.getAreaQueue());
-                        node.setLastQueueJobsSnapshot(node.getQueueJobs());
-
-                        nextReportTime += 200.0;
-
-                        // caso B: il prossimo evento cade prima del report → processalo
-                    } */
 
                     // caso A: report prima del prossimo evento
                     if (nextReportTime <= tnext && nextReportTime <= STOP) {
@@ -141,52 +103,6 @@ public class SimpleSystem implements Sistema{
                         break;
                     }
                 }
-
-
-
-//                while ((tnext = node.peekNextEventTime()) < STOP) {
-//                    node.processNextEvent(tnext);
-//                    while (node.getCurrentTime() >= nextReportTime) {
-//                        // CALCOLA I DELTA rispetto all'ultimo snapshot
-//                        double deltaArea  = node.getArea()      - node.getLastAreaSnapshot();
-//                        long   deltaJobs  = node.getProcessedJobs() - node.getLastProcessedSnapshot();
-//                        double deltaQArea = node.getAreaQueue() - node.getLastQueueAreaSnapshot();
-//                        long   deltaQJobs = node.getQueueJobs() - node.getLastQueueJobsSnapshot();
-//                        double intervalLength = nextReportTime
-//                                - (nextReportTime - 20.0); // =20
-//
-//                        // medie sull’intervallo
-//                        double eTs = deltaJobs > 0 ? deltaArea / deltaJobs : 0.0;
-//                        double eNs = deltaArea / intervalLength;
-//                        double eTq = deltaQJobs > 0 ? deltaQArea / deltaQJobs : 0.0;
-//                        double eNq = deltaQArea / intervalLength;
-//                        double serviceInterval = node.getIncrementalServiceTime();
-//                        double rho = (serviceInterval / intervalLength) / SERVERS[i];
-//
-//                        // SCRIVO su CSV
-//                        FileCSVGenerator.writeIntervalData(
-//                                true,           // finite
-//                                rep + 1,        // seed
-//                                i,              // centerIndex
-//                                nextReportTime,
-//                                eTs, eNs, eTq, eNq, rho
-//                        );
-//
-//                        // **AGGIORNO I MARKER** per il prossimo delta
-//                        node.setLastAreaSnapshot(node.getArea());
-//                        node.setLastProcessedSnapshot(node.getProcessedJobs());
-//                        node.setLastQueueAreaSnapshot(node.getAreaQueue());
-//                        node.setLastQueueJobsSnapshot(node.getQueueJobs());
-//
-//                        nextReportTime += 20.0;
-//
-//                        System.out.printf("Δarea=%.3f, Δjobs=%d, Δqarea=%.3f, Δqjobs=%d%n",
-//                                deltaArea, deltaJobs, deltaQArea, deltaQJobs);
-//                    }
-//
-//                }
-
-
 
 
 
@@ -245,10 +161,11 @@ public class SimpleSystem implements Sistema{
         systemStats.printFinalStats("SYSTEM");
     }
 
+
     @Override
     public void runInfiniteSimulation() {
-        final int BATCH_SIZE = 1000;
-        final int N_BATCHES  = 30;
+        final int BATCH_SIZE = 256;
+        final int N_BATCHES  = 64;
 
         System.out.println("=== Infinite Simulation – Batch Means ===");
         Rngs rng = new Rngs();
@@ -260,22 +177,24 @@ public class SimpleSystem implements Sistema{
             nodesLoc.add(new SimpleMultiserverNode(this, i, SERVERS[i], rng));
         }
 
-        // buffer per aree accumulate (per batch) di nodo e sistema
-        double[] lastAreaNode = new double[NODES];
-        double[] lastAreaQueueNode  = new double[NODES];
-        long[]   lastQueueJobsNode  = new long[NODES];
-        double   lastAreaSys  = 0.0;
-        double   lastAreaQueueSys   = 0.0;
-        double   startTimeBatch = 0.0;      // ADDED: inizio del batch
-        double   endTimeBatch   = 0.0;      // ADDED: fine del batch
+        // Variabili per accumulo cumulativo dei globali
+        double cumETs = 0.0, cumENs = 0.0, cumETq = 0.0, cumENq = 0.0, cumRho = 0.0;
+
+        // Marker per delta batch
+        double[] lastAreaNode      = new double[NODES];
+        double[] lastAreaQueueNode = new double[NODES];
+        long[]   lastQueueJobsNode = new long[NODES];
+        double   lastAreaSys       = 0.0;
+        double   lastAreaQueueSys  = 0.0;
 
         int batchCount  = 0;
         int jobsInBatch = 0;
+        double startTimeBatch = 0.0, endTimeBatch = 0.0;
 
         while (batchCount < N_BATCHES) {
-            // Trovo il prossimo evento in tutto il sistema
+            // Trovo e processiamo il prossimo evento di sistema
             double tnext = Double.POSITIVE_INFINITY;
-            int chosen = -1;
+            int    chosen = -1;
             for (int i = 0; i < NODES; i++) {
                 double t = nodesLoc.get(i).peekNextEventTime();
                 if (t < tnext) {
@@ -286,97 +205,89 @@ public class SimpleSystem implements Sistema{
             int srv = nodesLoc.get(chosen).processNextEvent(tnext);
             if (srv >= 0) {
                 if (jobsInBatch == 0) {
-                    startTimeBatch = tnext;          // ADDED: segno inizio batch
+                    startTimeBatch = tnext;
                 }
                 jobsInBatch++;
-                endTimeBatch = tnext;               // ADDED: aggiorno fine batch
+                endTimeBatch = tnext;
             }
 
+            // Se raccolti abbastanza job, chiudo il batch
             if (jobsInBatch >= BATCH_SIZE) {
-                // Per ogni nodo calcolo il batch‐mean e lo inserisco
-                double areaSys = 0.0;
-                double areaQueueSys = 0.0;                        // ADDED: area di coda totale in questo batch
-                long   queueJobsSys = 0;
-                long jobsProcessedInBatch = 0;
+                batchCount++;
+
+                // Calcolo dei contributi per ogni nodo
+                double areaSys        = 0.0;
+                double areaQueueSys   = 0.0;
+                long   queueJobsSys   = 0;
+                int    jobsProcessed  = 0;
 
                 for (int i = 0; i < NODES; i++) {
                     SimpleMultiserverNode node = nodesLoc.get(i);
-                    double areaNode = node.getAvgResponse() * node.getProcessedJobs();
-                    double batchMeanNode = (areaNode - lastAreaNode[i]) / BATCH_SIZE;
-                    nodeStats[i].insert(batchMeanNode, batchMeanNode, batchMeanNode, batchMeanNode, batchMeanNode);
-                    lastAreaNode[i] = areaNode;
-                    areaSys += areaNode;
-                    jobsProcessedInBatch += node.getProcessedJobs() - node.getLastProcessedJobs();
-                    node.setLastProcessedJobs(node.getProcessedJobs()); // <-- Devi esporre questi metodi nella classe SimpleMultiserverNode
 
+                    // ETs: area‐based
+                    double nodeTotalArea = node.getAvgResponse() * node.getProcessedJobs();
+                    areaSys += nodeTotalArea;
+                    int   processedNow   = (int)(node.getProcessedJobs() - node.getLastProcessedJobs());
+                    jobsProcessed += processedNow;
+                    node.setLastProcessedJobs(node.getProcessedJobs());
+                    lastAreaNode[i] = nodeTotalArea;
 
-                    // --- ADDED: calcolo area coda e job in coda nel batch per nodo ---
-                    double thisAreaQueue = node.getAreaQueue();
-                    long   thisQueueJobs = node.getQueueJobs();
-                    double deltaAreaQueue = thisAreaQueue - lastAreaQueueNode[i];
-                    long   deltaJobsQueue = thisQueueJobs - lastQueueJobsNode[i];
-                    areaQueueSys += deltaAreaQueue;
-                    queueJobsSys += deltaJobsQueue;
-                    lastAreaQueueNode[i] = thisAreaQueue;
-                    lastQueueJobsNode[i]   = thisQueueJobs;
+                    // ENs & queue
+                    double thisAreaQ  = node.getAreaQueue();
+                    long   thisQJobs  = node.getQueueJobs();
+
+                    areaQueueSys += thisAreaQ;
+                    queueJobsSys += thisQJobs;
+                    lastAreaQueueNode[i] = thisAreaQ;
+                    lastQueueJobsNode[i] = thisQJobs;
                 }
 
-                // Calcolo batch-mean di sistema e lo inserisco
-                double batchMeanSys = jobsProcessedInBatch > 0
-                        ? (areaSys - lastAreaSys) / jobsProcessedInBatch
+                // Metriche di batch
+                double batchETs = (jobsProcessed > 0)
+                        ? (areaSys - lastAreaSys) / jobsProcessed
                         : 0.0;
-
-                // Popolazione media di sistema per batch
-                double deltaAreaSys = areaSys - lastAreaSys;           // area nel solo batch
-                double deltaTime    = endTimeBatch - startTimeBatch;   // durata del batch
-                double ensBatch     = deltaAreaSys / deltaTime;       // ENs corretto
-
-                double batchMeanQueue = queueJobsSys > 0
+                double batchENs = (areaSys - lastAreaSys) / (endTimeBatch - startTimeBatch);
+                double batchETq = (queueJobsSys > 0)
                         ? (areaQueueSys - lastAreaQueueSys) / queueJobsSys
-                        : 0.0;                             // tempo medio di attesa in coda
-                double avgNumQueue    = (areaQueueSys - lastAreaQueueSys) / (BATCH_SIZE * NODES);
+                        : 0.0;
+                double batchENq = (areaQueueSys - lastAreaQueueSys) / (BATCH_SIZE * NODES);
 
-                // 4) *** MODIFIED: CALCOLO DI RHO ***
-                // calcolo tempo totale di servizio erogato nel batch
-                double serviceTimeBatch = 0.0;                         // ADDED
-                for (SimpleMultiserverNode node : nodesLoc) {         // ADDED
-                    serviceTimeBatch += node.getIncrementalServiceTime(); // ADDED: devi esporre questo metodo
+                // Rho batch
+                double serviceTimeBatch = 0.0;
+                for (SimpleMultiserverNode node : nodesLoc) {
+                    serviceTimeBatch += node.getIncrementalServiceTime();
                 }
-                int totalServers = Arrays.stream(SERVERS).mapToInt(Integer::intValue).sum(); // ADDED
-                double rhoBatch = (serviceTimeBatch / deltaTime) / totalServers; // ADDED
+                int totalServers = Arrays.stream(SERVERS).mapToInt(Integer::intValue).sum();
+                double batchRho = (serviceTimeBatch / (endTimeBatch - startTimeBatch)) / totalServers;
 
-                // 5) inserisco in systemStats
-                systemStats.insert(
-                        batchMeanSys,  // ETs
-                        ensBatch,      // ENs  <-- MODIFIED
-                        batchMeanQueue,// ETq
-                        avgNumQueue,   // ENq
-                        rhoBatch       // Rho  <-- MODIFIED
+                // Inserisco nella statistica di sistema per batch
+                systemStats.insert(batchETs, batchENs, batchETq, batchENq, batchRho);
+
+                // Aggiorno i cumulativi
+                cumETs += batchETs;
+                cumENs += batchENs;
+                cumETq += batchETq;
+                cumENq += batchENq;
+                cumRho += batchRho;
+
+                // Scrivo la media cumulativa fino a questo batch
+                FileCSVGenerator.writeInfiniteGlobal(
+                        batchCount,
+                        cumETs / batchCount,
+                        cumENs / batchCount,
+                        cumETq / batchCount,
+                        cumENq / batchCount,
+                        cumRho / batchCount
                 );
 
-                // 6) SCRITTURA CSV se vuoi
-                FileCSVGenerator.writeRepData(
-                        false,                     // isFinite?
-                        1,                         // seed
-                        -1,                        // system
-                        batchCount + 1,            // runNumber
-                        endTimeBatch,              // time di chiusura batch
-                        batchMeanSys,
-                        ensBatch,
-                        batchMeanQueue,
-                        avgNumQueue,
-                        rhoBatch
-                );
-
-                // 7) reset per il prossimo batch
+                // Reset contatore jobs per il batch successivo
                 lastAreaSys      = areaSys;
                 lastAreaQueueSys = areaQueueSys;
                 jobsInBatch      = 0;
-                batchCount++;
             }
         }
 
-        // Stampa nodi e sistema
+        // Stampa finale delle statistiche
         System.out.println("=== Infinite Simulation – Node Stats ===");
         for (int i = 0; i < NODES; i++) {
             nodeStats[i].printFinalStats("Node " + i);
@@ -384,6 +295,8 @@ public class SimpleSystem implements Sistema{
         System.out.println("=== Infinite Simulation – System Stats ===");
         systemStats.printFinalStats("SYSTEM");
     }
+
+
 
     /** Calcola la media delle utilizzazioni registrate in nodeStats */
     private double computeSystemUtilization() {

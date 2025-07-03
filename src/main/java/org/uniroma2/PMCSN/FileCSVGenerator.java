@@ -97,7 +97,41 @@ public class FileCSVGenerator {
             }
         }
 
+    /**
+     * Scrive la media cumulativa dei globali dei batch in infinite_global.csv
+     * I campi sono separati da virgola e i decimali usano punto.
+     * Ogni riga k contiene la media cumulativa fino al batch k.
+     */
+    public static void writeInfiniteGlobal(
+            int batchNumber,
+            double cumETs,
+            double cumENs,
+            double cumETq,
+            double cumENq,
+            double cumRho
+    ) {
+        String fileName = RESULT + "infinite_global.csv";
+        boolean newFile = ensureFile(fileName);
 
+        try (FileWriter fw = new FileWriter(fileName, true)) {
+            if (newFile) {
+                // header
+                fw.append("Batch,ETs,ENs,ETq,ENq,Rho\n");
+            }
+            // riga cumulativa
+            fw.append(String.join(",",
+                    String.valueOf(batchNumber),
+                    String.format(Locale.US, "%.5f", cumETs),
+                    String.format(Locale.US, "%.5f", cumENs),
+                    String.format(Locale.US, "%.5f", cumETq),
+                    String.format(Locale.US, "%.5f", cumENq),
+                    String.format(Locale.US, "%.5f", cumRho)
+            ));
+            fw.append("\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
 
 

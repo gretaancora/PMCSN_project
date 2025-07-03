@@ -17,7 +17,15 @@ public interface Node {
     void addNumber();
     void collectStatistics(int replicaIndex);
     void printFinalStats();  // calcola medie + σ e stampa a video
-
-
+    double getAreaQueue();
+    long getQueueJobs();
+    double getIncrementalServiceTime();
     ReplicationStats getStats();
+    void integrateTo(double t);
+    /**
+     * Restituisce l’area sotto la curva del numero in sistema
+     */
+    double getArea();
+
+    double getUtilization();
 }
