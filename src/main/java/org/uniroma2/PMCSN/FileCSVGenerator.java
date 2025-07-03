@@ -3,6 +3,7 @@ package org.uniroma2.PMCSN;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Locale;
 
 public class FileCSVGenerator {
 
@@ -60,4 +61,44 @@ public class FileCSVGenerator {
             e.printStackTrace();
         }
     }
+
+        public static void writeIntervalData(
+                boolean isFinite,
+                long seed,
+                int centerIndex,
+                double time,
+                double eTs,
+                double eNs,
+                double eTq,
+                double eNq,
+                double rho
+        ) {
+            String suffix = isFinite ? "finite_interval" : "infinite_interval";
+            String fileName = RESULT + suffix + "_center" + centerIndex + ".csv";
+            boolean newFile = ensureFile(fileName);
+
+            try (FileWriter fw = new FileWriter(fileName, true)) {
+                if (newFile) {
+                    fw.append("Seed,Center,Time,ETs,ENs,ETq,ENq,Rho\n");
+                }
+                fw.append(String.join(",",
+                        String.valueOf(seed),
+                        String.valueOf(centerIndex),
+                        String.format(Locale.US,"%.2f", time),
+                        String.format(Locale.US,"%.5f", eTs),
+                        String.format(Locale.US,"%.5f", eNs),
+                        String.format(Locale.US,"%.5f", eTq),
+                        String.format(Locale.US,"%.5f", eNq),
+                        String.format(Locale.US,"%.5f", rho)
+                ));
+                fw.append("\n");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+
+
+
+
 }

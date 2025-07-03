@@ -8,7 +8,7 @@ import java.util.List;
 public class SimpleSystem implements Sistema{
     private static final int NODES    = 3;
     private static final int REPLICAS = 4;
-    private static final double STOP  = 1000.0;
+    private static final double STOP  = 10000.0;
     public static final Integer[] SERVERS = {33, 11, 11};
 
     // Statistiche per ogni nodo
@@ -32,14 +32,125 @@ public class SimpleSystem implements Sistema{
             long   sumJobsSys      = 0;
             double sumAreaQueueSys = 0.0;
             long   sumQueueJobsSys = 0;
+           // double nextReportTime = 20.0;
 
             // Simulo nodo per nodo
             for (int i = 0; i < NODES; i++) {
                 SimpleMultiserverNode node = new SimpleMultiserverNode(this, i, SERVERS[i], rng);
-                double tnext;
-                while ((tnext = node.peekNextEventTime()) < STOP) {
-                    node.processNextEvent(tnext);
+                double nextReportTime = 200.0;
+
+                node.setLastAreaSnapshot(0.0);
+                node.setLastProcessedSnapshot(0);
+                node.setLastQueueAreaSnapshot(0.0);
+                node.setLastQueueJobsSnapshot(0);
+
+
+//                double tnext;
+
+
+                while (true) {
+                    double tnext = node.peekNextEventTime();
+
+                    // se non ci sono più eventi utili e ho già superato STOP e l’ultimo report:
+                    if ((tnext > STOP) && (nextReportTime > STOP)) {
+                        break;
+                    }
+
+                    // caso A: il report cade prima del prossimo evento
+                    if (nextReportTime <= tnext && nextReportTime <= STOP) {
+                        // 1) integra fino a t = nextReportTime
+                        node.integrateTo(nextReportTime);
+
+                        // 2) calcola i delta sull’esatto intervallo di 20 unità
+                        double deltaArea  = node.getArea()      - node.getLastAreaSnapshot();
+                        long   deltaJobs  = node.getProcessedJobs() - node.getLastProcessedSnapshot();
+                        double deltaQArea = node.getAreaQueue() - node.getLastQueueAreaSnapshot();
+                        long   deltaQJobs = node.getQueueJobs() - node.getLastQueueJobsSnapshot();
+                        double intervalLength = 200.0;
+
+                        double eTs = deltaJobs > 0 ? deltaArea / deltaJobs : 0.0;
+                        double eNs = deltaArea / intervalLength;
+                        double eTq = deltaQJobs > 0 ? deltaQArea / deltaQJobs : 0.0;
+                        double eNq = deltaQArea / intervalLength;
+                        double serviceInterval = node.getIncrementalServiceTime();
+                        double rho = (serviceInterval / intervalLength) / SERVERS[i];
+
+                        // 3) scrivi su CSV
+                        FileCSVGenerator.writeIntervalData(
+                                true,            // finite
+                                rep + 1,         // seed
+                                i,               // centro
+                                nextReportTime,  // istante esatto
+                                eTs, eNs, eTq, eNq, rho
+                        );
+
+                        // 4) aggiorna i marker
+                        node.setLastAreaSnapshot(node.getArea());
+                        node.setLastProcessedSnapshot(node.getProcessedJobs());
+                        node.setLastQueueAreaSnapshot(node.getAreaQueue());
+                        node.setLastQueueJobsSnapshot(node.getQueueJobs());
+
+                        nextReportTime += 200.0;
+
+                        // caso B: il prossimo evento cade prima del report → processalo
+                    } else if (tnext <= STOP) {
+                        node.processNextEvent(tnext);
+
+                        // caso C: non ci sono eventi entro STOP, ma magari ci sono ancora report pendenti > STOP
+                    } else {
+                        // nessun altro evento da processare, ma reportTime > STOP, esco
+                        break;
+                    }
                 }
+
+
+
+//                while ((tnext = node.peekNextEventTime()) < STOP) {
+//                    node.processNextEvent(tnext);
+//                    while (node.getCurrentTime() >= nextReportTime) {
+//                        // CALCOLA I DELTA rispetto all'ultimo snapshot
+//                        double deltaArea  = node.getArea()      - node.getLastAreaSnapshot();
+//                        long   deltaJobs  = node.getProcessedJobs() - node.getLastProcessedSnapshot();
+//                        double deltaQArea = node.getAreaQueue() - node.getLastQueueAreaSnapshot();
+//                        long   deltaQJobs = node.getQueueJobs() - node.getLastQueueJobsSnapshot();
+//                        double intervalLength = nextReportTime
+//                                - (nextReportTime - 20.0); // =20
+//
+//                        // medie sull’intervallo
+//                        double eTs = deltaJobs > 0 ? deltaArea / deltaJobs : 0.0;
+//                        double eNs = deltaArea / intervalLength;
+//                        double eTq = deltaQJobs > 0 ? deltaQArea / deltaQJobs : 0.0;
+//                        double eNq = deltaQArea / intervalLength;
+//                        double serviceInterval = node.getIncrementalServiceTime();
+//                        double rho = (serviceInterval / intervalLength) / SERVERS[i];
+//
+//                        // SCRIVO su CSV
+//                        FileCSVGenerator.writeIntervalData(
+//                                true,           // finite
+//                                rep + 1,        // seed
+//                                i,              // centerIndex
+//                                nextReportTime,
+//                                eTs, eNs, eTq, eNq, rho
+//                        );
+//
+//                        // **AGGIORNO I MARKER** per il prossimo delta
+//                        node.setLastAreaSnapshot(node.getArea());
+//                        node.setLastProcessedSnapshot(node.getProcessedJobs());
+//                        node.setLastQueueAreaSnapshot(node.getAreaQueue());
+//                        node.setLastQueueJobsSnapshot(node.getQueueJobs());
+//
+//                        nextReportTime += 20.0;
+//
+//                        System.out.printf("Δarea=%.3f, Δjobs=%d, Δqarea=%.3f, Δqjobs=%d%n",
+//                                deltaArea, deltaJobs, deltaQArea, deltaQJobs);
+//                    }
+//
+//                }
+
+
+
+
+
                 // raccolta stats nodo
                 node.collectStatistics(rep);
 
@@ -249,4 +360,6 @@ public class SimpleSystem implements Sistema{
     public void generateFeedback(MsqEvent event) {
         //non usato in questo sistema
     }
+
+
 }

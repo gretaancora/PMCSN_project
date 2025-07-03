@@ -31,6 +31,13 @@ public class SimpleMultiserverNode implements Node{
     private double lastTotalService = 0.0;
 
 
+    // Marker per snapshot a intervalli
+    private double lastAreaSnapshot      = 0.0;
+    private long   lastProcessedSnapshot = 0;
+    private double lastQueueAreaSnapshot = 0.0;
+    private long   lastQueueJobsSnapshot = 0;
+
+
 
     public SimpleMultiserverNode(Sistema system, int index, int servers, Rngs rng) {
         this.SERVERS = servers;
@@ -43,6 +50,8 @@ public class SimpleMultiserverNode implements Node{
         this.centerIndex = index;
         this.system = system;
         this.lastTotalService = 0.0;
+
+
 
         // eventi e somme
         event = new ArrayList<>();
@@ -192,6 +201,7 @@ public class SimpleMultiserverNode implements Node{
         double u = uniform(alpha, beta, r);
         //System.out.println("Servizio:" + idfNormal(30.0, 2.0, u));
         return idfNormal(20.0, 2.0, u);
+        //return exponential(20.0,r);
     }
 
 
@@ -310,6 +320,46 @@ public class SimpleMultiserverNode implements Node{
     public void setLastProcessedJobs(long value) {
         this.lastProcessedJobs = value;
     }
+
+
+
+
+        // getters & setters
+        public double getLastAreaSnapshot()                    { return lastAreaSnapshot; }
+        public void   setLastAreaSnapshot(double v)            { lastAreaSnapshot = v; }
+        public long   getLastProcessedSnapshot()               { return lastProcessedSnapshot; }
+        public void   setLastProcessedSnapshot(long v)         { lastProcessedSnapshot = v; }
+        public double getLastQueueAreaSnapshot()               { return lastQueueAreaSnapshot; }
+        public void   setLastQueueAreaSnapshot(double v)       { lastQueueAreaSnapshot = v; }
+        public long   getLastQueueJobsSnapshot()               { return lastQueueJobsSnapshot; }
+        public void   setLastQueueJobsSnapshot(long v)         { lastQueueJobsSnapshot = v; }
+
+
+    /**
+     * Restituisce l’area sotto la curva del numero in sistema
+     */
+    public double getArea() {
+        return area;
+    }
+
+
+
+
+        /**
+         * Integra le aree fino al tempo t (t ≥ currentTime), senza generare alcun evento.
+         */
+        public void integrateTo(double t) {
+            if (t <= currentTime) return;
+            double dt = t - currentTime;
+            // integrale numero in sistema
+            area += dt * number;
+            // integrale numero in coda
+            if (number > SERVERS) {
+                areaQueue += dt * (number - SERVERS);
+            }
+            currentTime = t;
+        }
+
 
 
 }
