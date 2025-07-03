@@ -57,7 +57,7 @@ public class SimpleSystem implements Sistema{
                     }
 
                     // caso A: il report cade prima del prossimo evento
-                    if (nextReportTime <= tnext && nextReportTime <= STOP) {
+                  /*  if (nextReportTime <= tnext && nextReportTime <= STOP) {
                         // 1) integra fino a t = nextReportTime
                         node.integrateTo(nextReportTime);
 
@@ -93,7 +93,46 @@ public class SimpleSystem implements Sistema{
                         nextReportTime += 200.0;
 
                         // caso B: il prossimo evento cade prima del report → processalo
-                    } else if (tnext <= STOP) {
+                    } */
+
+                    // caso A: report prima del prossimo evento
+                    if (nextReportTime <= tnext && nextReportTime <= STOP) {
+                        // 1) integra fino a t = nextReportTime
+                        node.integrateTo(nextReportTime);
+
+                        // 2) calcola le cumulative fino a qui
+                        double cumArea  = node.getArea();
+                        long   cumJobs  = node.getProcessedJobs();
+                        double cumQArea = node.getAreaQueue();
+                        long   cumQJobs = node.getQueueJobs();
+                        double t        = nextReportTime;
+
+                        double cumETs = cumJobs  > 0 ? cumArea  / cumJobs  : 0.0;
+                        double cumENs = cumArea  / t;
+                        double cumETq = cumQJobs > 0 ? cumQArea / cumQJobs : 0.0;
+                        double cumENq = cumQArea / t;
+                        double cumRho = node.getUtilization();
+
+                        // 3) scrivi SOLO cumulative
+                        FileCSVGenerator.writeIntervalData(
+                                true,            // finite
+                                rep + 1,         // seed
+                                i,               // centerIndex
+                                nextReportTime,  // Time
+                                // cumulative
+                                cumETs,
+                                cumENs,
+                                cumETq,
+                                cumENq,
+                                cumRho
+                        );
+
+                        // 4) non ci sono marker da aggiornare, perché usiamo sempre i totali
+                        nextReportTime += 200.0;  // o 200.0 come preferisci
+                    }
+
+
+                    else if (tnext <= STOP) {
                         node.processNextEvent(tnext);
 
                         // caso C: non ci sono eventi entro STOP, ma magari ci sono ancora report pendenti > STOP
