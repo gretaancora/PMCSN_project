@@ -322,19 +322,6 @@ public class SimpleMultiserverNode implements Node{
     }
 
 
-
-
-        // getters & setters
-        public double getLastAreaSnapshot()                    { return lastAreaSnapshot; }
-        public void   setLastAreaSnapshot(double v)            { lastAreaSnapshot = v; }
-        public long   getLastProcessedSnapshot()               { return lastProcessedSnapshot; }
-        public void   setLastProcessedSnapshot(long v)         { lastProcessedSnapshot = v; }
-        public double getLastQueueAreaSnapshot()               { return lastQueueAreaSnapshot; }
-        public void   setLastQueueAreaSnapshot(double v)       { lastQueueAreaSnapshot = v; }
-        public long   getLastQueueJobsSnapshot()               { return lastQueueJobsSnapshot; }
-        public void   setLastQueueJobsSnapshot(long v)         { lastQueueJobsSnapshot = v; }
-
-
     /**
      * Restituisce l’area sotto la curva del numero in sistema
      */
@@ -359,6 +346,27 @@ public class SimpleMultiserverNode implements Node{
             }
             currentTime = t;
         }
+
+
+    /** Azzera tutti i contatori e le aree per una nuova replica */
+    public void resetState() {
+        this.number      = 0;
+        this.index       = 0;
+        this.area        = 0.0;
+        this.areaQueue   = 0.0;
+        this.queueJobs   = 0;
+        this.currentTime = 0.0;
+        this.lastTotalService           = 0.0;
+        // reset sum[] per server
+        for (MsqSum s : sum) {
+            s.service = 0.0;
+            s.served  = 0;
+        }
+        // reset event times: rischedula il primo arrivo
+        event.get(ARRIVAL).t = getNextArrivalTime();
+        event.get(ARRIVAL).x = 1;
+        // per semplicità, non tocchiamo pendingArrivals qui
+    }
 
 
 

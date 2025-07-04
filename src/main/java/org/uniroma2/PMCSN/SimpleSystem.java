@@ -2,11 +2,9 @@ package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 
 public class SimpleSystem implements Sistema{
     private static final int NODES    = 3;
@@ -40,12 +38,7 @@ public class SimpleSystem implements Sistema{
             // Simulo nodo per nodo
             for (int i = 0; i < NODES; i++) {
                 SimpleMultiserverNode node = new SimpleMultiserverNode(this, i, SERVERS[i], rng);
-                double nextReportTime = 200.0;
-
-                node.setLastAreaSnapshot(0.0);
-                node.setLastProcessedSnapshot(0);
-                node.setLastQueueAreaSnapshot(0.0);
-                node.setLastQueueJobsSnapshot(0);
+                double nextReportTime = 50.0;
 
 
                 while (true) {
@@ -90,7 +83,7 @@ public class SimpleSystem implements Sistema{
                         );
 
                         // 4) non ci sono marker da aggiornare, perché usiamo sempre i totali
-                        nextReportTime += 200.0;  // o 200.0 come preferisci
+                        nextReportTime += 50.0;  // o 200.0 come preferisci
                     }
 
 
@@ -124,32 +117,6 @@ public class SimpleSystem implements Sistema{
                 sumAreaQueueSys += node.getAreaQueue();
                 sumQueueJobsSys += node.getQueueJobs();
             }
-
-            // Calcolo metriche di sistema per questa replica
-            double systemETs = sumAreaSys / sumJobsSys;
-            double systemENS = sumAreaSys / STOP;
-            double systemETq = sumQueueJobsSys > 0
-                    ? sumAreaQueueSys / sumQueueJobsSys
-                    : 0.0;
-            double systemENq = sumAreaQueueSys / STOP;
-            double systemRho = computeSystemUtilization();
-
-            // inserisco nelle stats globali
-            systemStats.insert(systemETs, systemENS, systemETq, systemENq, systemRho);
-
-            FileCSVGenerator.writeRepData(
-                    true,           // isFinite = true
-                    rep + 1,        // seed della replica (oppure usa il seed corretto)
-                    -1,             // centerIndex = -1 per indicare "sistema"
-                    rep + 1,        // runNumber = numero replica
-                    STOP,           // tempo simulazione
-                    systemETs,
-                    systemENS,
-                    systemETq,
-                    systemENq,
-                    systemRho
-            );
-
         }
 
         // Stampo i risultati
@@ -157,8 +124,8 @@ public class SimpleSystem implements Sistema{
         for (int i = 0; i < NODES; i++) {
             nodeStats[i].printFinalStats("Node " + i);
         }
-        System.out.println("=== Finite Simulation – System Stats ===");
-        systemStats.printFinalStats("SYSTEM");
+
+
     }
 
 

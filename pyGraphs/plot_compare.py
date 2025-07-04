@@ -11,7 +11,7 @@ def plot_response_times(csv_path, out_dir, time_col='Time', response_col='ETs'):
     fig, ax = plt.subplots(figsize=(10, 6))
     for seed_value, group in df.groupby(seed_col):
         ax.plot(group[time_col], group[response_col],
-                label=str(seed_value), marker='o')
+                label=str(seed_value), linestyle='-')
     ax.set_title("Andamento dei Tempi di Risposta nel Tempo")
     ax.set_xlabel(time_col); ax.set_ylabel(response_col)
     ax.grid(True)
@@ -29,7 +29,7 @@ def plot_job_counts(csv_path, out_dir, time_col='Time', jobs_col='ENs'):
     fig, ax = plt.subplots(figsize=(10, 6))
     for seed_value, group in df.groupby(seed_col):
         ax.plot(group[time_col], group[jobs_col],
-                label=str(seed_value), marker='s')
+                label=str(seed_value), linestyle='-')
     ax.set_title("Andamento del Numero di Job nel Centro nel Tempo")
     ax.set_xlabel(time_col); ax.set_ylabel(jobs_col)
     ax.grid(True)

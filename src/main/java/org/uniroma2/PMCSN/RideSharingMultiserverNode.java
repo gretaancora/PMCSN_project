@@ -428,5 +428,26 @@ public class RideSharingMultiserverNode implements Node{
                 : 0.0;
     }
 
+    public void resetState() {
+        this.number      = 0;
+        this.index       = 0;
+        this.area        = 0.0;
+        this.areaQueue   = 0.0;
+        this.queueJobs   = 0;
+        this.currentTime = 0.0;
+        this.lastTotalService = 0.0;
+        // reset sum per server
+        for (MsqSum s : sum) {
+            s.service = 0.0;
+            s.served  = 0;
+        }
+        // rischedula primo arrivo
+        event[ARRIVAL].t = getNextArrivalTime();
+        event[ARRIVAL].x = 1;
+        event[ARRIVAL].postiRichiesti = getNumPosti();
+        // svuota la coda pendente
+        pendingArrivals.clear();
+    }
+
 
 }
