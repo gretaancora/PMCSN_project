@@ -105,7 +105,7 @@ public class SimpleMultiserverNode implements Node{
 //        System.out.println("number: " + number);
 //        System.out.println("tnext: " + tnext);
 //        System.out.println("currenttime: " + currentTime);
-      //  System.out.println("Area SIMPLE: " + area);
+        //  System.out.println("Area SIMPLE: " + area);
         currentTime = tnext;
 
         if (e == ARRIVAL || e>SERVERS) {
@@ -142,7 +142,7 @@ public class SimpleMultiserverNode implements Node{
         } else {
             // DEPARTURE da server e = srv
             index++;
-           // System.out.println("Completamento SIMPLE: " + index);
+            // System.out.println("Completamento SIMPLE: " + index);
             number--;
             // coda non vuota?
             if (number >= SERVERS) {
@@ -332,20 +332,20 @@ public class SimpleMultiserverNode implements Node{
 
 
 
-        /**
-         * Integra le aree fino al tempo t (t ≥ currentTime), senza generare alcun evento.
-         */
-        public void integrateTo(double t) {
-            if (t <= currentTime) return;
-            double dt = t - currentTime;
-            // integrale numero in sistema
-            area += dt * number;
-            // integrale numero in coda
-            if (number > SERVERS) {
-                areaQueue += dt * (number - SERVERS);
-            }
-            currentTime = t;
+    /**
+     * Integra le aree fino al tempo t (t ≥ currentTime), senza generare alcun evento.
+     */
+    public void integrateTo(double t) {
+        if (t <= currentTime) return;
+        double dt = t - currentTime;
+        // integrale numero in sistema
+        area += dt * number;
+        // integrale numero in coda
+        if (number > SERVERS) {
+            areaQueue += dt * (number - SERVERS);
         }
+        currentTime = t;
+    }
 
 
     /** Azzera tutti i contatori e le aree per una nuova replica */

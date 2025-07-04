@@ -96,7 +96,7 @@ public class RideSharingMultiserverNode implements Node{
     public int findOne() {
         int totalMatched = 0;
         boolean servedSomething;
-      //  System.out.println("Size pre matching: " + pendingArrivals.size());
+        //  System.out.println("Size pre matching: " + pendingArrivals.size());
         int numMatch = 0;
 
         do {
@@ -169,8 +169,8 @@ public class RideSharingMultiserverNode implements Node{
 
         } while (servedSomething);
 
-    //    System.out.println("Total matches: " + totalMatched);
-    //    System.out.println("Size post matching: " + pendingArrivals.size());
+        //    System.out.println("Total matches: " + totalMatched);
+        //    System.out.println("Size post matching: " + pendingArrivals.size());
 
 
         return totalMatched;
@@ -210,10 +210,10 @@ public class RideSharingMultiserverNode implements Node{
         double tnext = event[e].t;
         // integrazione area
         area += (tnext - currentTime) * number;
-     //   System.out.println("RS number: " + number);
+        //   System.out.println("RS number: " + number);
         //System.out.println("RS tnext: " + tnext);
         //System.out.println("RS currenttime: " + currentTime);
-    //    System.out.println("RS Area: " + area);
+        //    System.out.println("RS Area: " + area);
         //System.out.println("RS index: " + index);
         currentTime = tnext;
         //System.out.println(e);
@@ -259,7 +259,7 @@ public class RideSharingMultiserverNode implements Node{
             sum[serverIndex].service += event[e].svc;
             sum[serverIndex].served += event[e].numRichiesteServite;
             index += event[e].numRichiesteServite;
-         //   System.out.println("Index: "+ index);
+            //   System.out.println("Index: "+ index);
             number-=event[e].numRichiesteServite;
 //            System.out.println("Server: " + e);
 //            System.out.println("Capacità del server: " + event[e].capacità);
@@ -345,9 +345,9 @@ public class RideSharingMultiserverNode implements Node{
     }
 
     public double getAvgResponse() {
-      //  System.out.println(area);
-      //  System.out.println(index);
-      //  System.out.println(area/index);
+        //  System.out.println(area);
+        //  System.out.println(index);
+        //  System.out.println(area/index);
         return area / index;
     }
 

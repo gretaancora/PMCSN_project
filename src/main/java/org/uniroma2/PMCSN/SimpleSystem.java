@@ -33,7 +33,7 @@ public class SimpleSystem implements Sistema{
             long   sumJobsSys      = 0;
             double sumAreaQueueSys = 0.0;
             long   sumQueueJobsSys = 0;
-           // double nextReportTime = 20.0;
+            // double nextReportTime = 20.0;
 
             // Simulo nodo per nodo
             for (int i = 0; i < NODES; i++) {
