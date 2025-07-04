@@ -1,7 +1,6 @@
 package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
-import org.uniroma2.PMCSN.Libs.Rvms;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,12 +17,7 @@ public class SimpleSystem implements Sistema{
     // Statistiche globali del sistema
     private final ReplicationStats   systemStats = new ReplicationStats();
 
-    /*aggiunta per le batch means*/
-    private final Rvms rvms;
-    /*aggiunta per le batch means*/
-
     public SimpleSystem() {
-        rvms = new Rvms();
         for (int i = 0; i < NODES; i++) {
             nodeStats[i] = new ReplicationStats();
         }
@@ -130,6 +124,8 @@ public class SimpleSystem implements Sistema{
         for (int i = 0; i < NODES; i++) {
             nodeStats[i].printFinalStats("Node " + i);
         }
+
+
     }
 
 
@@ -161,15 +157,6 @@ public class SimpleSystem implements Sistema{
         int batchCount  = 0;
         int jobsInBatch = 0;
         double startTimeBatch = 0.0, endTimeBatch = 0.0;
-
-        /*aggiunte le liste per batch means */
-        // Liste per batch means
-        List<Double> etList = new ArrayList<>();
-        List<Double> enList = new ArrayList<>();
-        List<Double> etqList = new ArrayList<>();
-        List<Double> enqList = new ArrayList<>();
-        List<Double> rhoList = new ArrayList<>();
-        /*aggiunte le liste per batch means */
 
         while (batchCount < N_BATCHES) {
             // Trovo e processiamo il prossimo evento di sistema
@@ -250,16 +237,6 @@ public class SimpleSystem implements Sistema{
                 cumENq += batchENq;
                 cumRho += batchRho;
 
-
-                /*aggiunte le liste per batch means */
-                etList.add(batchETs);
-                enList.add(batchENs);
-                etqList.add(batchETq);
-                enqList.add(batchENq);
-                rhoList.add(batchRho);
-                /*aggiunte le liste per batch means */
-
-
                 // Scrivo la media cumulativa fino a questo batch
                 FileCSVGenerator.writeInfiniteGlobal(
                         batchCount,
@@ -277,26 +254,16 @@ public class SimpleSystem implements Sistema{
             }
         }
 
-        /* // Stampa finale delle statistiche
+        // Stampa finale delle statistiche
         System.out.println("=== Infinite Simulation – Node Stats ===");
         for (int i = 0; i < NODES; i++) {
             nodeStats[i].printFinalStats("Node " + i);
         }
-
         System.out.println("=== Infinite Simulation – System Stats ===");
-        systemStats.printFinalStats("SYSTEM");*/
-
-        System.out.println("=== Intervalli di confidenza (95%) ===");
-
-        systemStats.printConfidenceInterval("ETs", etList);
-        systemStats.printConfidenceInterval("ENs", enList);
-        systemStats.printConfidenceInterval("ETq", etqList);
-        systemStats.printConfidenceInterval("ENq", enqList);
-        systemStats.printConfidenceInterval("Rho", rhoList);
-
-        System.out.println("=== Infinite Simulation – Fine ===");
-
+        systemStats.printFinalStats("SYSTEM");
     }
+
+
 
     /** Calcola la media delle utilizzazioni registrate in nodeStats */
     private double computeSystemUtilization() {
@@ -307,8 +274,11 @@ public class SimpleSystem implements Sistema{
         return sum / NODES;
     }
 
+
     @Override
     public void generateFeedback(MsqEvent event) {
         //non usato in questo sistema
     }
+
+
 }

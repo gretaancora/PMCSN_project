@@ -296,121 +296,13 @@ public class RideSharingSystem implements Sistema {
     }
 */
 
-//    @Override
-//    public void runInfiniteSimulation() {
-//        final int BATCH_SIZE = 256;
-//        final int N_BATCHES  = 64;
-//        final int TOTAL_NODES = SIMPLE_CENTERS + RIDE_CENTERS;
-//
-//        System.out.println("=== RideSharingSystem (Infinite Simulation – Batch Means) ===");
-//        System.out.printf("Nodi: %d (simple=%d, ride=%d), Batch size: %d, #Batch totali: %d%n",
-//                TOTAL_NODES, SIMPLE_CENTERS, RIDE_CENTERS, BATCH_SIZE, N_BATCHES);
-//
-//        // Prepara CSV (header)
-//        FileCSVGenerator.writeInfiniteGlobal(0, 0, 0, 0, 0, 0);
-//
-//        // Inizializza RNG e nodi
-//        Rngs rng = new Rngs();
-//        rng.plantSeeds(1);
-//        List<Node> nodesLoc = new ArrayList<>(TOTAL_NODES);
-//        for (int i = 0; i < SIMPLE_CENTERS; i++)
-//            nodesLoc.add(new SimpleMultiserverNode(this, i, SERVERS_SIMPLE[i], rng));
-//        for (int j = 0; j < RIDE_CENTERS; j++)
-//            nodesLoc.add(new RideSharingMultiserverNode(rng, this));
-//
-//        int   batchCount    = 0;
-//        int   completions   = 0;
-//        double startBatch   = 0.0, endBatch = 0.0;
-//
-//        while (batchCount < N_BATCHES) {
-//            // 1) Trova prossimo evento
-//            double tnext = Double.POSITIVE_INFINITY;
-//            Node   chosen = null;
-//            for (Node n : nodesLoc) {
-//                double t = n.peekNextEventTime();
-//                if (t < tnext) {
-//                    tnext = t;
-//                    chosen = n;
-//                }
-//            }
-//
-//            // ← CORRETTO: integra tutti i nodi fino a tnext
-//            for (Node n : nodesLoc) {
-//                if (n instanceof SimpleMultiserverNode)
-//                    n.integrateTo(tnext);
-//                else
-//                    n.integrateTo(tnext);
-//            }
-//
-//            // 2) Processa l’evento “vincente”
-//            int srv = chosen.processNextEvent(tnext);
-//            if (srv >= 0) {
-//                if (completions == 0) startBatch = tnext; // inizio batch
-//                completions++;
-//                endBatch = tnext;                         // fine batch
-//            }
-//
-//            // 3) Se chiudo un batch…
-//            if (completions >= BATCH_SIZE) {
-//                batchCount++;
-//
-//                // ← CORRETTO: sommo le aree e i job di *tutti* i nodi
-//                double totalArea     = 0.0;
-//                double totalQueueA   = 0.0;
-//                long   totalJobs     = 0;
-//                long   totalQueueJobs= 0;
-//                for (Node n : nodesLoc) {
-//                    totalArea      += n.getArea();         // area integrata per nodo
-//                    totalQueueA    += n.getAreaQueue();
-//                    totalJobs      += n.getProcessedJobs();
-//                    totalQueueJobs += n.getQueueJobs();
-//                }
-//
-//                double totalTime = endBatch;                          // ← FIX: tempo dall'inizio al termine di questo batch
-//
-//                // metriche cumulative corrette:
-//                double cumETs = totalJobs   > 0      ? totalArea   / totalJobs   : 0.0;
-//                double cumENs = totalTime    > 0      ? totalArea   / totalTime   : 0.0;  // ← FIX
-//                double cumETq = totalQueueJobs > 0    ? totalQueueA / totalQueueJobs : 0.0;
-//                double cumENq = totalTime    > 0      ? totalQueueA / totalTime   : 0.0;  // ← FIX
-//
-//                // utilizzo cumulativo
-//                double servInc = 0.0;
-//                for (Node n : nodesLoc) {
-//                    servInc += n.getIncrementalServiceTime();
-//                }
-//                int totalServers = Arrays.stream(SERVERS_SIMPLE).mapToInt(x->x).sum()
-//                        + RIDE_CENTERS * RideSharingMultiserverNode.getNumServersPerRide();
-//
-//                double cumRho = totalTime > 0
-//                        ? (servInc / totalTime) / totalServers
-//                        : 0.0;  // ← FIX
-//
-//                // Scrivo il cumulativo su CSV
-//                FileCSVGenerator.writeInfiniteGlobal(
-//                        batchCount,
-//                        cumETs,
-//                        cumENs,
-//                        cumETq,
-//                        cumENq,
-//                        cumRho
-//                );
-//
-//                // Reset per il prossimo batch
-//                completions = 0;
-//            }
-//        }
-//
-//        System.out.println("=== Infinite Simulation – Fine ===");
-//    }
-
     @Override
     public void runInfiniteSimulation() {
         final int BATCH_SIZE = 256;
         final int N_BATCHES  = 64;
         final int TOTAL_NODES = SIMPLE_CENTERS + RIDE_CENTERS;
 
-        System.out.println("=== RideSharingSystem (Infinite Simulation – Batch Means – Simple Style) ===");
+        System.out.println("=== RideSharingSystem (Infinite Simulation – Batch Means) ===");
         System.out.printf("Nodi: %d (simple=%d, ride=%d), Batch size: %d, #Batch totali: %d%n",
                 TOTAL_NODES, SIMPLE_CENTERS, RIDE_CENTERS, BATCH_SIZE, N_BATCHES);
 
@@ -421,30 +313,17 @@ public class RideSharingSystem implements Sistema {
         Rngs rng = new Rngs();
         rng.plantSeeds(1);
         List<Node> nodesLoc = new ArrayList<>(TOTAL_NODES);
-        for (int i = 0; i < SIMPLE_CENTERS; i++) {
+        for (int i = 0; i < SIMPLE_CENTERS; i++)
             nodesLoc.add(new SimpleMultiserverNode(this, i, SERVERS_SIMPLE[i], rng));
-        }
-        for (int j = 0; j < RIDE_CENTERS; j++) {
+        for (int j = 0; j < RIDE_CENTERS; j++)
             nodesLoc.add(new RideSharingMultiserverNode(rng, this));
-        }
 
-        // Variabili cumulative globali
-        double cumETs = 0.0, cumENs = 0.0, cumETq = 0.0, cumENq = 0.0, cumRho = 0.0;
-
-        // Marker per delta batch
-        double[] lastAreaNode      = new double[TOTAL_NODES];
-        double[] lastAreaQueueNode = new double[TOTAL_NODES];
-        long[]   lastProcessedJobs = new long[TOTAL_NODES];
-        long[]   lastQueueJobs     = new long[TOTAL_NODES];
-        double   lastAreaSys       = 0.0;
-        double   lastAreaQueueSys  = 0.0;
-
-        int batchCount    = 0;
-        int completions   = 0;
-        double startBatch = 0.0, endBatch = 0.0;
+        int   batchCount    = 0;
+        int   completions   = 0;
+        double startBatch   = 0.0, endBatch = 0.0;
 
         while (batchCount < N_BATCHES) {
-            // Trova prossimo evento
+            // 1) Trova prossimo evento
             double tnext = Double.POSITIVE_INFINITY;
             Node   chosen = null;
             for (Node n : nodesLoc) {
@@ -455,100 +334,76 @@ public class RideSharingSystem implements Sistema {
                 }
             }
 
-            // Integra tutti i nodi fino a tnext
+            // ← CORRETTO: integra tutti i nodi fino a tnext
             for (Node n : nodesLoc) {
-                n.integrateTo(tnext);
+                if (n instanceof SimpleMultiserverNode)
+                    n.integrateTo(tnext);
+                else
+                    n.integrateTo(tnext);
             }
 
-            // Processa l’evento
+            // 2) Processa l’evento “vincente”
             int srv = chosen.processNextEvent(tnext);
             if (srv >= 0) {
-                if (completions == 0) {
-                    startBatch = tnext;
-                }
+                if (completions == 0) startBatch = tnext; // inizio batch
                 completions++;
-                endBatch = tnext;
+                endBatch = tnext;                         // fine batch
             }
 
-            // Chiudi batch
+            // 3) Se chiudo un batch…
             if (completions >= BATCH_SIZE) {
                 batchCount++;
 
-                // Calcolo area e job cumulati
-                double areaSys      = 0.0;
-                double areaQueueSys = 0.0;
-                long   totalJobs    = 0;
-                long   totalQueueJobs = 0;
-                int    batchJobsProcessed = 0;
-
-                for (int i = 0; i < TOTAL_NODES; i++) {
-                    Node node = nodesLoc.get(i);
-                    double a   = node.getArea();
-                    double aq  = node.getAreaQueue();
-                    long  pj   = node.getProcessedJobs();
-                    long  qj   = node.getQueueJobs();
-
-                    areaSys        += a;
-                    areaQueueSys   += aq;
-                    totalJobs      += pj;
-                    totalQueueJobs += qj;
-
-                    int deltaProcessed = (int)(pj - lastProcessedJobs[i]);
-                    batchJobsProcessed += deltaProcessed;
-
-                    lastAreaNode[i]      = a;
-                    lastAreaQueueNode[i] = aq;
-                    lastProcessedJobs[i] = pj;
-                    lastQueueJobs[i]     = qj;
+                // ← CORRETTO: sommo le aree e i job di *tutti* i nodi
+                double totalArea     = 0.0;
+                double totalQueueA   = 0.0;
+                long   totalJobs     = 0;
+                long   totalQueueJobs= 0;
+                for (Node n : nodesLoc) {
+                    totalArea      += n.getArea();         // area integrata per nodo
+                    totalQueueA    += n.getAreaQueue();
+                    totalJobs      += n.getProcessedJobs();
+                    totalQueueJobs += n.getQueueJobs();
                 }
 
-                // Metriche di batch
-                double batchETs = batchJobsProcessed > 0
-                        ? (areaSys - lastAreaSys) / batchJobsProcessed
-                        : 0.0;
-                double batchENs = (areaSys - lastAreaSys) / (endBatch - startBatch);
-                long   queueJobsDelta = totalQueueJobs - Arrays.stream(lastQueueJobs).sum();
-                double batchETq = queueJobsDelta > 0
-                        ? (areaQueueSys - lastAreaQueueSys) / queueJobsDelta
-                        : 0.0;
-                double batchENq = (areaQueueSys - lastAreaQueueSys) / (endBatch - startBatch);
+                double totalTime = endBatch;                          // ← FIX: tempo dall'inizio al termine di questo batch
 
-                // Rho di batch
+                // metriche cumulative corrette:
+                double cumETs = totalJobs   > 0      ? totalArea   / totalJobs   : 0.0;
+                double cumENs = totalTime    > 0      ? totalArea   / totalTime   : 0.0;  // ← FIX
+                double cumETq = totalQueueJobs > 0    ? totalQueueA / totalQueueJobs : 0.0;
+                double cumENq = totalTime    > 0      ? totalQueueA / totalTime   : 0.0;  // ← FIX
+
+                // utilizzo cumulativo
                 double servInc = 0.0;
                 for (Node n : nodesLoc) {
                     servInc += n.getIncrementalServiceTime();
                 }
-                int totalServers = Arrays.stream(SERVERS_SIMPLE).mapToInt(x -> x).sum()
+                int totalServers = Arrays.stream(SERVERS_SIMPLE).mapToInt(x->x).sum()
                         + RIDE_CENTERS * RideSharingMultiserverNode.getNumServersPerRide();
-                double batchRho = (servInc / (endBatch - startBatch)) / totalServers;
 
-                // Inserimento batch e aggiornamento cumulativi
-                systemStats.insert(batchETs, batchENs, batchETq, batchENq, batchRho);
-                cumETs += batchETs;
-                cumENs += batchENs;
-                cumETq += batchETq;
-                cumENq += batchENq;
-                cumRho += batchRho;
+                double cumRho = totalTime > 0
+                        ? (servInc / totalTime) / totalServers
+                        : 0.0;  // ← FIX
 
-                // Scrittura medias globali su CSV
+                // Scrivo il cumulativo su CSV
                 FileCSVGenerator.writeInfiniteGlobal(
                         batchCount,
-                        cumETs / batchCount,
-                        cumENs / batchCount,
-                        cumETq / batchCount,
-                        cumENq / batchCount,
-                        cumRho / batchCount
+                        cumETs,
+                        cumENs,
+                        cumETq,
+                        cumENq,
+                        cumRho
                 );
 
-                // Reset marker per batch successivo
-                lastAreaSys      = areaSys;
-                lastAreaQueueSys = areaQueueSys;
-                completions      = 0;
+                // Reset per il prossimo batch
+                completions = 0;
             }
         }
 
         System.out.println("=== Infinite Simulation – Fine ===");
     }
+
 
 
 
@@ -566,6 +421,5 @@ public class RideSharingSystem implements Sistema {
         }
     }
 
-    private final ReplicationStats   systemStats = new ReplicationStats();
 
 }
