@@ -43,7 +43,6 @@ public class Main {
 
             System.out.println("Not valid choice!");
         }
-
         return choice;
     }
 }

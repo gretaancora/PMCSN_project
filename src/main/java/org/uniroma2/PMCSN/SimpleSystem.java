@@ -158,6 +158,15 @@ public class SimpleSystem implements Sistema{
         int jobsInBatch = 0;
         double startTimeBatch = 0.0, endTimeBatch = 0.0;
 
+        /*aggiunte le liste per batch means */
+        // Liste per batch means
+        List<Double> etList = new ArrayList<>();
+        List<Double> enList = new ArrayList<>();
+        List<Double> etqList = new ArrayList<>();
+        List<Double> enqList = new ArrayList<>();
+        List<Double> rhoList = new ArrayList<>();
+        /*aggiunte le liste per batch means */
+
         while (batchCount < N_BATCHES) {
             // Trovo e processiamo il prossimo evento di sistema
             double tnext = Double.POSITIVE_INFINITY;
@@ -221,6 +230,7 @@ public class SimpleSystem implements Sistema{
 
                 // Rho batch
                 double serviceTimeBatch = 0.0;
+
                 for (SimpleMultiserverNode node : nodesLoc) {
                     serviceTimeBatch += node.getIncrementalServiceTime();
                 }
@@ -236,6 +246,14 @@ public class SimpleSystem implements Sistema{
                 cumETq += batchETq;
                 cumENq += batchENq;
                 cumRho += batchRho;
+
+                /*aggiunte le liste per batch means */
+                etList.add(batchETs);
+                enList.add(batchENs);
+                etqList.add(batchETq);
+                enqList.add(batchENq);
+                rhoList.add(batchRho);
+                /*aggiunte le liste per batch means */
 
                 // Scrivo la media cumulativa fino a questo batch
                 FileCSVGenerator.writeInfiniteGlobal(
@@ -254,31 +272,19 @@ public class SimpleSystem implements Sistema{
             }
         }
 
-        // Stampa finale delle statistiche
-        System.out.println("=== Infinite Simulation – Node Stats ===");
-        for (int i = 0; i < NODES; i++) {
-            nodeStats[i].printFinalStats("Node " + i);
-        }
-        System.out.println("=== Infinite Simulation – System Stats ===");
-        systemStats.printFinalStats("SYSTEM");
+        System.out.println("=== Intervalli di confidenza (95%) ===");
+
+        systemStats.printConfidenceInterval("ETs", etList);
+        systemStats.printConfidenceInterval("ENs", enList);
+        systemStats.printConfidenceInterval("ETq", etqList);
+        systemStats.printConfidenceInterval("ENq", enqList);
+        systemStats.printConfidenceInterval("Rho", rhoList);
+
+        System.out.println("=== Infinite Simulation – Fine ===");
     }
-
-
-
-    /** Calcola la media delle utilizzazioni registrate in nodeStats */
-    private double computeSystemUtilization() {
-        double sum = 0.0;
-        for (int i = 0; i < NODES; i++) {
-            sum += nodeStats[i].mean(nodeStats[i].getUtilizations());
-        }
-        return sum / NODES;
-    }
-
 
     @Override
     public void generateFeedback(MsqEvent event) {
         //non usato in questo sistema
     }
-
-
 }

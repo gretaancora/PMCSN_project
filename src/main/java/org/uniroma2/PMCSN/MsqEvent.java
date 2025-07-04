@@ -8,5 +8,4 @@ public class MsqEvent {        /* the next-event list    */
     int capacitàRimanente;
     int numRichiesteServite;
     double svc;
-
 }

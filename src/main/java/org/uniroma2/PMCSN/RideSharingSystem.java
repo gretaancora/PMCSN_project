@@ -443,6 +443,15 @@ public class RideSharingSystem implements Sistema {
         int completions   = 0;
         double startBatch = 0.0, endBatch = 0.0;
 
+        /*aggiunte le liste per batch means */
+        // Liste per batch means
+        List<Double> etList = new ArrayList<>();
+        List<Double> enList = new ArrayList<>();
+        List<Double> etqList = new ArrayList<>();
+        List<Double> enqList = new ArrayList<>();
+        List<Double> rhoList = new ArrayList<>();
+        /*aggiunte le liste per batch means */
+
         while (batchCount < N_BATCHES) {
             // Trova prossimo evento
             double tnext = Double.POSITIVE_INFINITY;
@@ -530,6 +539,15 @@ public class RideSharingSystem implements Sistema {
                 cumENq += batchENq;
                 cumRho += batchRho;
 
+                /*aggiunte le liste per batch means */
+                // Salva il batch
+                etList.add(batchETs);
+                enList.add(batchENs);
+                etqList.add(batchETq);
+                enqList.add(batchENq);
+                rhoList.add(batchRho);
+                /*aggiunte le liste per batch means */
+
                 // Scrittura medias globali su CSV
                 FileCSVGenerator.writeInfiniteGlobal(
                         batchCount,
@@ -547,10 +565,19 @@ public class RideSharingSystem implements Sistema {
             }
         }
 
+        /*aggiunte le liste per batch means */
+        // Calcola e stampa intervalli di confidenza
+        System.out.println("=== Intervalli di confidenza (95%) ===");
+
+        systemStats.printConfidenceInterval("ETs", etList);
+        systemStats.printConfidenceInterval("ENs", enList);
+        systemStats.printConfidenceInterval("ETq", etqList);
+        systemStats.printConfidenceInterval("ENq", enqList);
+        systemStats.printConfidenceInterval("Rho", rhoList);
+        /*aggiunte le liste per batch means */
+
         System.out.println("=== Infinite Simulation – Fine ===");
     }
-
-
 
 
     public void generateFeedback(MsqEvent event) {
