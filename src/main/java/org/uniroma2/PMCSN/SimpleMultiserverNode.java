@@ -282,18 +282,6 @@ public class SimpleMultiserverNode implements Node{
         stats.insert(eTs, eNs, eTq, eNq, rho);
     }
 
-
-    @Override
-    public void printFinalStats() {
-        // stampa media ± 95% CI
-        stats.printFinalStats("Node " + centerIndex);
-    }
-
-    @Override
-    public ReplicationStats getStats() {
-        return stats;
-    }
-
     /**
      * Restituisce il servizio erogato (somma di sum[s].service) da
      * quando è stato registrato l'ultimo batch, e aggiorna il marcatore.
@@ -350,24 +338,22 @@ public class SimpleMultiserverNode implements Node{
 
     /** Azzera tutti i contatori e le aree per una nuova replica */
     public void resetState() {
-        this.number      = 0;
-        this.index       = 0;
-        this.area        = 0.0;
-        this.areaQueue   = 0.0;
-        this.queueJobs   = 0;
+        this.number = 0;
+        this.index = 0;
+        this.area = 0.0;
+        this.areaQueue = 0.0;
+        this.queueJobs = 0;
         this.currentTime = 0.0;
-        this.lastTotalService           = 0.0;
+        this.lastTotalService = 0.0;
         // reset sum[] per server
         for (MsqSum s : sum) {
             s.service = 0.0;
-            s.served  = 0;
+            s.served = 0;
         }
         // reset event times: rischedula il primo arrivo
         event.get(ARRIVAL).t = getNextArrivalTime();
         event.get(ARRIVAL).x = 1;
         // per semplicità, non tocchiamo pendingArrivals qui
     }
-
-
 
 }

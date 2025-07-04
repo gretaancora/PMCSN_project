@@ -192,17 +192,6 @@ public class RideSharingMultiserverNode implements Node{
 
     }
 
-    @Override
-    public void printFinalStats() {
-
-    }
-
-    @Override
-    public ReplicationStats getStats() {
-        return null;
-    }
-
-
     // Avanza la simulazione di questo nodo fino all'evento scelto
     // e restituisce eventuale DEPARTURE schedulato (server index), oppure -1.
     public int processNextEvent(double t) {
@@ -448,6 +437,4 @@ public class RideSharingMultiserverNode implements Node{
         // svuota la coda pendente
         pendingArrivals.clear();
     }
-
-
 }

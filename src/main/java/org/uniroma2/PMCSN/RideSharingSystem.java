@@ -22,7 +22,6 @@ public class RideSharingSystem implements Sistema {
             6,
             6
     };
-    private static final int SERVERS_RIDESHARING = 30;
     private Rngs rng;
     private static final List<Node> nodes = new ArrayList<>(4);
 
@@ -151,259 +150,6 @@ public class RideSharingSystem implements Sistema {
         }
     }
 
-
-
-    /*@Override
-    public void runFiniteSimulation() {
-        double totalProcessed = 0.0;
-        double totalWaiting = 0.0;
-
-        for (int rep = 0; rep < REPLICAS; rep++) {
-            // Inizializza generatore RNG per ogni replica
-            rng = new Rngs();
-            rng.plantSeeds(rep + 1);
-
-            while (true) {
-                int j=0;
-                double tmin = Double.MAX_VALUE;
-                double tcurr;
-
-                // Prendo indice centro con prossimo evento con time minore
-                for (int i = 0; i < 4; i++) {
-                    tcurr = nodes.get(i).peekNextEventTime();
-                    if (tcurr < tmin) {
-                        tmin = tcurr;
-                        j=i;
-                    }
-                }
-
-                if (tmin > STOP) break;
-
-                //processo il prossimo evento
-                nodes.get(j).processNextEvent(tmin);
-            }
-
-            // Raccogli statistiche
-            for (int i = 0; i < 4; i++) {
-                totalProcessed += nodes.get(i).getProcessedJobs();
-                totalWaiting += nodes.get(i).getAvgResponse();
-            }
-        }
-
-        // Calcola medie
-        double avgProcessed = totalProcessed / (REPLICAS * (RIDE_CENTERS + SIMPLE_CENTERS));
-        double avgWaiting = totalWaiting / (REPLICAS * (RIDE_CENTERS + SIMPLE_CENTERS));
-
-        // Stampa risultati
-        System.out.println("=== RideSharingSystem (Finite Simulation) ===");
-        System.out.printf("Repliche: %d%n", REPLICAS);
-        System.out.printf("Simple Centers: %d, Ride-Sharing Centers: %d%n", SIMPLE_CENTERS, RIDE_CENTERS);
-        System.out.printf("Avg. processed jobs per center: %.2f%n", avgProcessed);
-        System.out.printf("Avg. response time per center:    %.2f%n", avgWaiting);
-    }*/
-/*
-    @Override
-    public void runInfiniteSimulation() {
-        final int BATCH_SIZE = 256;   // job per batch
-        final int N_BATCHES  = 64;     // numero totale di batch
-
-        System.out.println("=== SimpleSystem (Infinite Simulation – Batch Means) ===");
-        System.out.printf("Nodi: %d, Batch size: %d, #Batch totali: %d%n",
-                SIMPLE_CENTERS+RIDE_CENTERS, BATCH_SIZE, N_BATCHES);
-
-        // inizializzo RNG una sola volta
-        Rngs rng = new Rngs();
-        rng.plantSeeds(1);
-
-        Node[] nodes = new Node[SIMPLE_CENTERS + RIDE_CENTERS];
-
-        for (int i = 0; i < SIMPLE_CENTERS; i++) {
-            nodes[i] = new SimpleMultiserverNode(this, i, SERVERS_SIMPLE[i], rng);
-        }
-
-        for (int i = 0; i < RIDE_CENTERS; i++) {
-            nodes[SIMPLE_CENTERS + i] = new RideSharingMultiserverNode(rng, this);
-        }
-
-        // Resetto BatchMeans
-        BatchMeans.resetNBatch();
-        BatchMeans.resetJobInBatch();
-
-        List<Double> batchMeans = new ArrayList<>();
-        double lastAreaSys = 0.0;   // area cumulata sistema fino a fine batch precedente
-
-        // Finché non ho raccolto N_BATCHES batch
-        while (BatchMeans.getNBatch() <= N_BATCHES) {
-            // Trovo il prossimo evento fra tutti i nodi
-            double tnext = Double.POSITIVE_INFINITY;
-            int    nextNode = -1;
-            int i;
-            for (i = 0; i < SIMPLE_CENTERS+RIDE_CENTERS; i++) {
-                double tn = nodes[i].peekNextEventTime();
-                if (tn < tnext) {
-                    tnext = tn;
-                    nextNode = i;
-                }
-            }
-
-            // Processa l'evento sul nodo scelto
-            int srv = nodes[nextNode].processNextEvent(tnext);
-
-            // Se è una DEPARTURE (server valido), conto un job nel batch
-            if ((srv >= 1 && nextNode < SIMPLE_CENTERS && srv <= SERVERS_SIMPLE[nextNode]) || (srv >= 1 && nextNode < SIMPLE_CENTERS+RIDE_CENTERS && srv <= SERVERS_RIDESHARING)) {
-                BatchMeans.incrementJobInBatch();
-            }
-
-            // Quando raggiungo BATCH_SIZE job, chiudo il batch
-            if (BatchMeans.getJobInBatch() >= BATCH_SIZE) {
-                // Calcolo l'area cumulata di tutto il sistema
-                double areaSys = 0.0;
-                long  jobsSys = 0;
-                for (i = 0; i < SIMPLE_CENTERS+RIDE_CENTERS; i++) {
-                    // getAvgWait * getProcessedJobs = area del singolo nodo
-                    areaSys += nodes[i].getAvgResponse() * nodes[i].getProcessedJobs();
-                    jobsSys += nodes[i].getProcessedJobs();
-                }
-                // Somma dei tempi d'attesa di questo batch sul sistema
-                double batchSum = areaSys - lastAreaSys;
-                double meanWait = batchSum / BATCH_SIZE;
-                batchMeans.add(meanWait);
-
-                System.out.printf("Batch %2d chiuso: mean wait sistema = %.4f%n",
-                        BatchMeans.getNBatch(), meanWait);
-
-                // Preparo il batch successivo
-                lastAreaSys = areaSys;
-                BatchMeans.incrementNBatch();
-                BatchMeans.resetJobInBatch();
-            }
-        }
-
-        // Calcolo media e varianza dei batch-means
-        double meanOfMeans = batchMeans.stream()
-                .mapToDouble(d -> d)
-                .average()
-                .orElse(0.0);
-        double var = batchMeans.stream()
-                .mapToDouble(d -> Math.pow(d - meanOfMeans, 2))
-                .sum()
-                / (batchMeans.size() - 1);
-
-        System.out.println("\n=== Summary Infinite Simulation ===");
-        System.out.printf("Totale batch: %d%n", N_BATCHES);
-        System.out.printf("Avg. of batch-means wait (sistema):     %.4f%n", meanOfMeans);
-        System.out.printf("Avg. of batch-means variance (sistema): %.4f%n", var);
-    }
-*/
-
-//    @Override
-//    public void runInfiniteSimulation() {
-//        final int BATCH_SIZE = 256;
-//        final int N_BATCHES  = 64;
-//        final int TOTAL_NODES = SIMPLE_CENTERS + RIDE_CENTERS;
-//
-//        System.out.println("=== RideSharingSystem (Infinite Simulation – Batch Means) ===");
-//        System.out.printf("Nodi: %d (simple=%d, ride=%d), Batch size: %d, #Batch totali: %d%n",
-//                TOTAL_NODES, SIMPLE_CENTERS, RIDE_CENTERS, BATCH_SIZE, N_BATCHES);
-//
-//        // Prepara CSV (header)
-//        FileCSVGenerator.writeInfiniteGlobal(0, 0, 0, 0, 0, 0);
-//
-//        // Inizializza RNG e nodi
-//        Rngs rng = new Rngs();
-//        rng.plantSeeds(1);
-//        List<Node> nodesLoc = new ArrayList<>(TOTAL_NODES);
-//        for (int i = 0; i < SIMPLE_CENTERS; i++)
-//            nodesLoc.add(new SimpleMultiserverNode(this, i, SERVERS_SIMPLE[i], rng));
-//        for (int j = 0; j < RIDE_CENTERS; j++)
-//            nodesLoc.add(new RideSharingMultiserverNode(rng, this));
-//
-//        int   batchCount    = 0;
-//        int   completions   = 0;
-//        double startBatch   = 0.0, endBatch = 0.0;
-//
-//        while (batchCount < N_BATCHES) {
-//            // 1) Trova prossimo evento
-//            double tnext = Double.POSITIVE_INFINITY;
-//            Node   chosen = null;
-//            for (Node n : nodesLoc) {
-//                double t = n.peekNextEventTime();
-//                if (t < tnext) {
-//                    tnext = t;
-//                    chosen = n;
-//                }
-//            }
-//
-//            // ← CORRETTO: integra tutti i nodi fino a tnext
-//            for (Node n : nodesLoc) {
-//                if (n instanceof SimpleMultiserverNode)
-//                    n.integrateTo(tnext);
-//                else
-//                    n.integrateTo(tnext);
-//            }
-//
-//            // 2) Processa l’evento “vincente”
-//            int srv = chosen.processNextEvent(tnext);
-//            if (srv >= 0) {
-//                if (completions == 0) startBatch = tnext; // inizio batch
-//                completions++;
-//                endBatch = tnext;                         // fine batch
-//            }
-//
-//            // 3) Se chiudo un batch…
-//            if (completions >= BATCH_SIZE) {
-//                batchCount++;
-//
-//                // ← CORRETTO: sommo le aree e i job di *tutti* i nodi
-//                double totalArea     = 0.0;
-//                double totalQueueA   = 0.0;
-//                long   totalJobs     = 0;
-//                long   totalQueueJobs= 0;
-//                for (Node n : nodesLoc) {
-//                    totalArea      += n.getArea();         // area integrata per nodo
-//                    totalQueueA    += n.getAreaQueue();
-//                    totalJobs      += n.getProcessedJobs();
-//                    totalQueueJobs += n.getQueueJobs();
-//                }
-//
-//                double totalTime = endBatch;                          // ← FIX: tempo dall'inizio al termine di questo batch
-//
-//                // metriche cumulative corrette:
-//                double cumETs = totalJobs   > 0      ? totalArea   / totalJobs   : 0.0;
-//                double cumENs = totalTime    > 0      ? totalArea   / totalTime   : 0.0;  // ← FIX
-//                double cumETq = totalQueueJobs > 0    ? totalQueueA / totalQueueJobs : 0.0;
-//                double cumENq = totalTime    > 0      ? totalQueueA / totalTime   : 0.0;  // ← FIX
-//
-//                // utilizzo cumulativo
-//                double servInc = 0.0;
-//                for (Node n : nodesLoc) {
-//                    servInc += n.getIncrementalServiceTime();
-//                }
-//                int totalServers = Arrays.stream(SERVERS_SIMPLE).mapToInt(x->x).sum()
-//                        + RIDE_CENTERS * RideSharingMultiserverNode.getNumServersPerRide();
-//
-//                double cumRho = totalTime > 0
-//                        ? (servInc / totalTime) / totalServers
-//                        : 0.0;  // ← FIX
-//
-//                // Scrivo il cumulativo su CSV
-//                FileCSVGenerator.writeInfiniteGlobal(
-//                        batchCount,
-//                        cumETs,
-//                        cumENs,
-//                        cumETq,
-//                        cumENq,
-//                        cumRho
-//                );
-//
-//                // Reset per il prossimo batch
-//                completions = 0;
-//            }
-//        }
-//
-//        System.out.println("=== Infinite Simulation – Fine ===");
-//    }
-
     @Override
     public void runInfiniteSimulation() {
         final int BATCH_SIZE = 256;
@@ -432,8 +178,6 @@ public class RideSharingSystem implements Sistema {
         double cumETs = 0.0, cumENs = 0.0, cumETq = 0.0, cumENq = 0.0, cumRho = 0.0;
 
         // Marker per delta batch
-        double[] lastAreaNode      = new double[TOTAL_NODES];
-        double[] lastAreaQueueNode = new double[TOTAL_NODES];
         long[]   lastProcessedJobs = new long[TOTAL_NODES];
         long[]   lastQueueJobs     = new long[TOTAL_NODES];
         double   lastAreaSys       = 0.0;
@@ -470,6 +214,7 @@ public class RideSharingSystem implements Sistema {
             }
 
             // Processa l’evento
+            assert chosen != null;
             int srv = chosen.processNextEvent(tnext);
             if (srv >= 0) {
                 if (completions == 0) {
@@ -505,8 +250,6 @@ public class RideSharingSystem implements Sistema {
                     int deltaProcessed = (int)(pj - lastProcessedJobs[i]);
                     batchJobsProcessed += deltaProcessed;
 
-                    lastAreaNode[i]      = a;
-                    lastAreaQueueNode[i] = aq;
                     lastProcessedJobs[i] = pj;
                     lastQueueJobs[i]     = qj;
                 }
@@ -568,14 +311,12 @@ public class RideSharingSystem implements Sistema {
         /*aggiunte le liste per batch means */
         // Calcola e stampa intervalli di confidenza
         System.out.println("=== Intervalli di confidenza (95%) ===");
-
         systemStats.printConfidenceInterval("ETs", etList);
         systemStats.printConfidenceInterval("ENs", enList);
         systemStats.printConfidenceInterval("ETq", etqList);
         systemStats.printConfidenceInterval("ENq", enqList);
         systemStats.printConfidenceInterval("Rho", rhoList);
         /*aggiunte le liste per batch means */
-
         System.out.println("=== Infinite Simulation – Fine ===");
     }
 
@@ -592,7 +333,5 @@ public class RideSharingSystem implements Sistema {
             nodes.get(2).addNumber();
         }
     }
-
     private final ReplicationStats   systemStats = new ReplicationStats();
-
 }

@@ -29,12 +29,6 @@ public class SimpleSystem implements Sistema{
             Rngs rng = new Rngs();
             rng.plantSeeds(rep + 1);
 
-            double sumAreaSys      = 0.0;
-            long   sumJobsSys      = 0;
-            double sumAreaQueueSys = 0.0;
-            long   sumQueueJobsSys = 0;
-            // double nextReportTime = 20.0;
-
             // Simulo nodo per nodo
             for (int i = 0; i < NODES; i++) {
                 SimpleMultiserverNode node = new SimpleMultiserverNode(this, i, SERVERS[i], rng);
@@ -111,11 +105,6 @@ public class SimpleSystem implements Sistema{
 
                 // inserisco nelle stats per quel nodo
                 nodeStats[i].insert(eTs, eNs, eTq, eNq, rho);
-
-                sumAreaSys      += node.getAvgResponse() * node.getProcessedJobs();  //accumulo i contributi per le statistiche globali
-                sumJobsSys      += node.getProcessedJobs();
-                sumAreaQueueSys += node.getAreaQueue();
-                sumQueueJobsSys += node.getQueueJobs();
             }
         }
 
@@ -147,10 +136,8 @@ public class SimpleSystem implements Sistema{
         // Variabili per accumulo cumulativo dei globali
         double cumETs = 0.0, cumENs = 0.0, cumETq = 0.0, cumENq = 0.0, cumRho = 0.0;
 
+
         // Marker per delta batch
-        double[] lastAreaNode      = new double[NODES];
-        double[] lastAreaQueueNode = new double[NODES];
-        long[]   lastQueueJobsNode = new long[NODES];
         double   lastAreaSys       = 0.0;
         double   lastAreaQueueSys  = 0.0;
 
@@ -206,7 +193,6 @@ public class SimpleSystem implements Sistema{
                     int   processedNow   = (int)(node.getProcessedJobs() - node.getLastProcessedJobs());
                     jobsProcessed += processedNow;
                     node.setLastProcessedJobs(node.getProcessedJobs());
-                    lastAreaNode[i] = nodeTotalArea;
 
                     // ENs & queue
                     double thisAreaQ  = node.getAreaQueue();
@@ -214,8 +200,6 @@ public class SimpleSystem implements Sistema{
 
                     areaQueueSys += thisAreaQ;
                     queueJobsSys += thisQJobs;
-                    lastAreaQueueNode[i] = thisAreaQ;
-                    lastQueueJobsNode[i] = thisQJobs;
                 }
 
                 // Metriche di batch
