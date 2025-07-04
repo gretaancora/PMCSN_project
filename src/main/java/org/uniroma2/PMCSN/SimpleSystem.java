@@ -1,6 +1,8 @@
 package org.uniroma2.PMCSN;
 
 import org.uniroma2.PMCSN.Libs.Rngs;
+import org.uniroma2.PMCSN.Utils.FileCSVGenerator;
+import org.uniroma2.PMCSN.Utils.ReplicationStats;
 
 import java.util.ArrayList;
 import java.util.Arrays;

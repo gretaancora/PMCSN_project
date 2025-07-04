@@ -1,4 +1,4 @@
-package org.uniroma2.PMCSN;
+package org.uniroma2.PMCSN.Utils;
 
 public class BatchMeans {
     private static int nBatch = 1;
