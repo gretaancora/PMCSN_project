@@ -1,8 +1,6 @@
 package org.uniroma2.PMCSN.Utils;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.Locale;
 
 public class FileCSVGenerator {
@@ -24,7 +22,7 @@ public class FileCSVGenerator {
         return false;
     }
 
-    public static void writeRepData(
+ /* public static void writeRepData(
             boolean isFinite,
             long seed,
             int centerIndex,
@@ -60,7 +58,7 @@ public class FileCSVGenerator {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
+    }*/
 
     public static void writeIntervalData(
             boolean isFinite,
@@ -132,6 +130,7 @@ public class FileCSVGenerator {
             e.printStackTrace();
         }
     }
+
     /**
      * Scrive le statistiche di batch-per-nodo per la simulazione infinita.
      * Ogni file si chiama infinite_local_center<X>.csv e contiene:
@@ -170,5 +169,53 @@ public class FileCSVGenerator {
     }
 
 
+    /**
+     * Scrive, per ogni replica, la media globale (tutti i nodi) al time stamp “time”
+     * in resources/results/finite_interval_global.csv.
+     */
 
+    public static void writeFiniteIntervalGlobalHeader() {
+        String fileName = RESULT + "finite_interval_global.csv";
+        boolean newFile = ensureFile(fileName);
+
+        if (newFile) {
+            try (FileWriter fw = new FileWriter(fileName, true)) {
+                fw.append("Seed,Time,ETs,ENs,ETq,ENq,Rho\n");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void writeFiniteIntervalGlobal(
+            long seed,
+            double time,
+            double cumETs,
+            double cumENs,
+            double cumETq,
+            double cumENq,
+            double cumRho
+    ) {
+        String fileName = RESULT + "finite_interval_global.csv";
+        boolean newFile = ensureFile(fileName);
+
+        try (FileWriter fw = new FileWriter(fileName, true)) {
+            if (newFile) {
+                // header già scritto da writeFiniteIntervalGlobalHeader()
+                fw.append("Seed,Time,ETs,ENs,ETq,ENq,Rho\n");
+            }
+            fw.append(String.join(",",
+                    String.valueOf(seed),
+                    String.format(Locale.US, "%.2f", time),
+                    String.format(Locale.US, "%.5f", cumETs),
+                    String.format(Locale.US, "%.5f", cumENs),
+                    String.format(Locale.US, "%.5f", cumETq),
+                    String.format(Locale.US, "%.5f", cumENq),
+                    String.format(Locale.US, "%.5f", cumRho)
+            ));
+            fw.append("\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

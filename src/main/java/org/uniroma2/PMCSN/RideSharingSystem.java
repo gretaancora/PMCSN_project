@@ -142,7 +142,7 @@ public class RideSharingSystem implements Sistema {
 
                         // scrivo la riga per il nodo i
                         FileCSVGenerator.writeIntervalData(
-                                false,      // nodo-level flag
+                                true,      // nodo-level flag
                                 rep,
                                 i,          // SYSTEM_INDEX = indice del nodo
                                 nextReportTime,
@@ -176,10 +176,6 @@ public class RideSharingSystem implements Sistema {
             System.out.printf(" Avg jobs: %.2f, Avg response: %.2f%n", avgProc, avgResp);
         }
     }
-
-
-
-
 
     @Override
     public void runInfiniteSimulation() {

@@ -19,17 +19,21 @@ public class SimpleMultiserverNode implements Node{
     private long number;        // job totali nel nodo (in servizio + in coda)
     private long index;         // contatore job processati
     private double area;        // integrale del numero in sistema
-    private double areaQueue = 0.0;  // area sotto la curva dei job in coda
+    private double areaQueue;  // area sotto la curva dei job in coda
+    private double areaService; //area sotto la curva dei job in servizio
+
     private long queueJobs = 0;      // numero totale di job che hanno fatto coda
     private final Rngs r;
-    private static final double P_EXIT = 0.2;
-    private static final double P_SMALL = 0.6;
-    private static final double P_MEDIUM = 0.2;
-    private static final double P_LARGE = 0.2;
     private final int centerIndex;
     private final Sistema system;
     private final ReplicationStats stats = new ReplicationStats();
     private double lastTotalService;
+
+    /*Constants*/
+    private static final double P_EXIT = 0.2;
+    private static final double P_SMALL = 0.6;
+    private static final double P_MEDIUM = 0.2;
+    private static final double P_LARGE = 0.2;
 
     public SimpleMultiserverNode(Sistema system, int index, int servers, Rngs rng) {
         this.SERVERS = servers;
@@ -38,11 +42,12 @@ public class SimpleMultiserverNode implements Node{
         this.number = 0;
         this.index = 0;
         this.area = 0.0;
+        this.areaQueue = 0.0;
+        this.areaService = 0.0;
         this.centerIndex = index;
         this.system = system;
         this.lastTotalService = 0.0;
         this.clock = new MsqT();
-
 
 
         // eventi e somme
@@ -59,8 +64,8 @@ public class SimpleMultiserverNode implements Node{
         }
 
         // schedulo il primo arrivo “esterno”
-        event.getFirst().t = getNextArrivalTime();
-        event.getFirst().x = 1;
+        event.get(ARRIVAL).t = getNextArrivalTime();
+        event.get(ARRIVAL).x = 1;
     }
 
     // Espone il prossimo evento attivo
@@ -87,12 +92,21 @@ public class SimpleMultiserverNode implements Node{
     // e restituisce eventuale DEPARTURE schedulato (server index), oppure -1.
     public int processNextEvent(double t) {
         int e = peekNextEventType();
-         clock.next = event.get(e).t;
-        // integrazione area
-        area += (clock.next - clock.current) * number;
+        clock.next = event.get(e).t;
+        // integrazione area (tutti i job nel sistema)
+
+        // integrazione aree
+        double dt = clock.next - clock.current;
+        /*area totale*/
+        area += dt * number;
+
+        // area servizio (fino a SERVERS o meno se ci sono meno job)
+        int busyServers = (int) Math.min(number, SERVERS);
+        areaService += dt * busyServers;
+
         // se c'è coda, incrementa anche areaQueue
         if (number > SERVERS) {
-            areaQueue += (clock.next - clock.current) * (number - SERVERS);
+            areaQueue += (dt) * (number - SERVERS);
         }
 
         clock.current = clock.next;
@@ -102,7 +116,7 @@ public class SimpleMultiserverNode implements Node{
                 // ARRIVAL “esterno” o da routing
                 number++;
                 // programma il prossimo ARRIVAL esterno
-                event.get(ARRIVAL).t = getNextArrivalTime();
+                event.getFirst().t = getNextArrivalTime();
                 r.selectStream(2); /* stream per generare la p di loss */
                 double pLoss = r.random();
                 if (pLoss < P_EXIT) {
@@ -151,7 +165,7 @@ public class SimpleMultiserverNode implements Node{
 
     public double getNextArrivalTime() {
         r.selectStream(0);
-        double lambda = 1.65;
+        double lambda = 2.25;
 
         if(system instanceof SimpleSystem) {
             switch (centerIndex) {
@@ -170,7 +184,7 @@ public class SimpleMultiserverNode implements Node{
         }
 
         sarrival += exponential(1/lambda, r);
-        //System.out.println("Arrivo a:" + sarrival);
+        /* System.out.println("Arrivo a:" + sarrival); */
         return sarrival;
     }
 
@@ -183,12 +197,12 @@ public class SimpleMultiserverNode implements Node{
         double a = 2;
         double b = 60;
 
-        alpha = cdfNormal(20.0, 2.0, a);
-        beta = cdfNormal(20.0, 2.0, b);
+        alpha = cdfNormal(20.0, 10.0, a);
+        beta = cdfNormal(20.0, 10.0, b);
 
         double u = uniform(alpha, beta, r);
-        //System.out.println("Servizio:" + idfNormal(30.0, 2.0, u));
-        return idfNormal(20.0, 2.0, u);
+        /*System.out.println("Servizio:" + idfNormal(20.0, 10.0, u));*/
+        return idfNormal(20.0, 10.0, u);
         //return exponential(20.0,r);
     }
 
@@ -202,11 +216,7 @@ public class SimpleMultiserverNode implements Node{
         return -1;  // nessun server libero
     }
 
-
-    // Metodi per statistiche a fine run
-    public double getAvgInterArrival() {
-        return event.get(ARRIVAL).t / index;
-    }
+    /* Metodi per statistiche a fine run */
 
     public double getAvgResponse() {
         return area / index;
@@ -214,10 +224,6 @@ public class SimpleMultiserverNode implements Node{
 
     public double getAvgNumInNode() {
         return area / clock.current;
-    }
-
-    public double getCurrentTime() {
-        return clock.current;
     }
 
     public long getProcessedJobs() {
@@ -250,6 +256,17 @@ public class SimpleMultiserverNode implements Node{
         return queueJobs;
     }
 
+    /* aggiunta per area service */
+
+    public double getAreaService() {
+        return areaService;
+    }
+
+    public double getNumInService() {
+        return Math.min(number, SERVERS);
+    }
+
+    /* aggiunta per area service */
 
     public double getUtilization() {
         double busyTime = 0.0;
@@ -305,24 +322,28 @@ public class SimpleMultiserverNode implements Node{
         return area;
     }
 
-
-
-
     /**
      * Integra le aree fino al tempo t (t ≥ currentTime), senza generare alcun evento.
      */
     public void integrateTo(double t) {
-        if (t <= clock.current) return;
+        if (!(t > clock.current)) return;
+        /*se t è minore o uguale al clock current non faccio nulla */
         double dt = t - clock.current;
+        /* tempo trascorso dall'ultimo aggiornamento*/
         // integrale numero in sistema
         area += dt * number;
+        /*base per altezza*/
         // integrale numero in coda
         if (number > SERVERS) {
             areaQueue += dt * (number - SERVERS);
         }
+
+        // area servizio
+        int busyServers = (int) Math.min(number, SERVERS);
+        areaService += dt * busyServers;
+
         clock.current = t;
     }
-
 
     /** Azzera tutti i contatori e le aree per una nuova replica */
     public void resetState() {
@@ -339,10 +360,9 @@ public class SimpleMultiserverNode implements Node{
             s.service = 0.0;
             s.served = 0;
         }
-        // reset event times: rischedula il primo arrivo
-        event.get(ARRIVAL).t = getNextArrivalTime();
-        event.get(ARRIVAL).x = 1;
+        /* reset event times: schedule il primo arrivo */
+        event.getFirst().t = getNextArrivalTime();
+        event.getFirst().x = 1;
         // per semplicità, non tocchiamo pendingArrivals qui
     }
-
 }
