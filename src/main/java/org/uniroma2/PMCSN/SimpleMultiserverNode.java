@@ -34,14 +34,6 @@ public class SimpleMultiserverNode implements Node{
     private static final int ARRIVAL = 0;
 
 
-    // Marker per snapshot a intervalli
-    private double lastAreaSnapshot      = 0.0;
-    private long   lastProcessedSnapshot = 0;
-    private double lastQueueAreaSnapshot = 0.0;
-    private long   lastQueueJobsSnapshot = 0;
-
-
-
     public SimpleMultiserverNode(Sistema system, int index, int servers, Rngs rng) {
         this.SERVERS = servers;
         this.r = rng;
