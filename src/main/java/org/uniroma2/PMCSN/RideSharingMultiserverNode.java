@@ -89,7 +89,7 @@ public class RideSharingMultiserverNode implements Node{
      * Tenta di servire quante più richieste possibili dalla coda pendingArrivals.
      * Prima prova su server già attivi (P_MATCH_BUSY), poi su server inattivi.
      * Ripete finché in un passaggio non viene servita almeno una richiesta.
-     * @return numero di richieste servite in totale in questo invocazione di findOne()*/
+     * @return numero di richieste servite in totale in questo invocation di findOne()*/
 
     public int findOne() {
         int totalMatched = 0;
@@ -181,7 +181,6 @@ public class RideSharingMultiserverNode implements Node{
 
     @Override
     public void collectStatistics(int replicaIndex) {
-
     }
 
     // Avanza la simulazione di questo nodo fino all'evento scelto
@@ -277,7 +276,8 @@ public class RideSharingMultiserverNode implements Node{
     public double getServiceTime() {
         r.selectStream(1);
         //return uniform(2.0, 10.0, r);
-        double alpha, beta;
+        double alpha;
+        double beta;
         double a = 1;
         double b = 60;
 
@@ -294,15 +294,15 @@ public class RideSharingMultiserverNode implements Node{
         double rand = r.random();
         if(rand<0.4){
             return 1;
-        }if (rand<0.7){
+        }else if (rand<0.7){
             return 2;
-        }if (rand<0.8){
+        }else if (rand<0.8){
             return 3;
-        }if (rand<0.85){
+        }else if (rand<0.85){
             return 4;
-        }if (rand<0.9){
+        }else if (rand<0.9){
             return 5;
-        }if (rand<0.95){
+        }else if (rand<0.95){
             return 6    ;
         }else{
             return 7;
