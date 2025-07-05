@@ -10,8 +10,6 @@ import static org.uniroma2.PMCSN.Libs.Distributions.idfNormal;
 
 public class RideSharingMultiserverNode implements Node{
 
-    private static final int ARRIVAL = 0;
-    private static final int SERVERS = 20;
     private double sarrival;    // orario cumulato per gli arrivi
     private final MsqEvent[] event;   // event[0]=next arrival, [1..S]=server departures
     private final MsqSum[] sum;       // statistiche per ogni server
@@ -20,6 +18,14 @@ public class RideSharingMultiserverNode implements Node{
     private long index;         // contatore job processati
     private double area;        // integrale del numero in sistema
     private final Rngs r;
+    private final Sistema system;
+    private double areaQueue = 0.0;  // area sotto la curva dei job in coda
+    private double lastTotalService;
+    private long queueJobs = 0;      // numero totale di job che hanno fatto coda
+    private static final List<MsqEvent> pendingArrivals = new ArrayList<MsqEvent>();
+    /*Costants*/
+    private static final int ARRIVAL = 0;
+    private static final int SERVERS = 20;
     private static final double P_EXIT = 0.2;
     private static final double FEEDBACK = 0.4;
     private static final double DELAY = 10;
@@ -29,14 +35,6 @@ public class RideSharingMultiserverNode implements Node{
     private static final int SERVER_LARGE = 5;
     private static final double P_MATCH_BUSY = 0.6;
     private static final double P_MATCH_IDLE = 0.6;
-    private static Sistema system;
-    private double areaQueue = 0.0;  // area sotto la curva dei job in coda
-    private double lastTotalService;
-    private long queueJobs = 0;      // numero totale di job che hanno fatto coda
-
-
-
-    private static List<MsqEvent> pendingArrivals = new ArrayList<MsqEvent>();
 
 
     public RideSharingMultiserverNode(Rngs rng, Sistema system) {
