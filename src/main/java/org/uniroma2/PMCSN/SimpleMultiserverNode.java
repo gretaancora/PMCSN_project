@@ -182,7 +182,8 @@ public class SimpleMultiserverNode implements Node{
     public double getServiceTime() {
         r.selectStream(1);
         //return uniform(2.0, 10.0, r);
-        double alpha, beta;
+        double alpha;
+        double beta;
         double a = 2;
         double b = 60;
 
@@ -343,9 +344,8 @@ public class SimpleMultiserverNode implements Node{
             s.served = 0;
         }
         // reset event times: rischedula il primo arrivo
-        event.get(ARRIVAL).t = getNextArrivalTime();
-        event.get(ARRIVAL).x = 1;
+        event.getFirst().t = getNextArrivalTime();
+        event.getFirst().x = 1;
         // per semplicità, non tocchiamo pendingArrivals qui
     }
-
 }
