@@ -49,7 +49,7 @@ public class RideSharingSystem implements Sistema {
         final double REPORT_INTERVAL = 50.0;
         final int    SYSTEM_INDEX    = -1;
         final double WARMUP = 200.0;                // elimina primo transient
-// NON scrivere nulla per t ≤ WARMUP
+        // NON scrivere nulla per t ≤ WARMUP
 
 
         for (int rep = 1; rep <= REPLICAS; rep++) {
@@ -92,7 +92,7 @@ public class RideSharingSystem implements Sistema {
                 }
 
                 // caso report prima del prossimo evento
-                if (nextReportTime <= tmin && nextReportTime <= STOP) {
+                if (nextReportTime <= tmin) {
                     // integra tutti i nodi fino a nextReportTime
                     for (Node n : localNodes) {
                         n.integrateTo(nextReportTime);
@@ -190,6 +190,9 @@ public class RideSharingSystem implements Sistema {
         // 1) CSV globale (medie cumulative)
         FileCSVGenerator.writeInfiniteGlobal(0, 0, 0, 0, 0, 0);
 
+        // ✅ Nuovo oggetto per raccogliere i batch-means
+        ReplicationStats replicationStats = new ReplicationStats();
+
         // 2) Inizializza RNG e nodi
         Rngs rng = new Rngs();
         rng.plantSeeds(1);
@@ -222,13 +225,6 @@ public class RideSharingSystem implements Sistema {
         int completions = 0;
         double startBatch = 0.0, endBatch = 0.0;
 
-        // 6) Liste per intervalli di confidenza globali
-        List<Double> etList  = new ArrayList<>();
-        List<Double> enList  = new ArrayList<>();
-        List<Double> etqList = new ArrayList<>();
-        List<Double> enqList = new ArrayList<>();
-        List<Double> rhoList = new ArrayList<>();
-
         // 7) Ciclo di simulazione a batch
         while (batchCount < N_BATCHES) {
             double tnext = Double.POSITIVE_INFINITY;
@@ -242,6 +238,7 @@ public class RideSharingSystem implements Sistema {
             }
             for (Node n : nodesLoc) n.integrateTo(tnext);
 
+            assert chosen != null;
             if (chosen.processNextEvent(tnext) >= 0) {
                 if (completions == 0) startBatch = tnext;
                 completions++;
@@ -280,6 +277,9 @@ public class RideSharingSystem implements Sistema {
                 double batchENq = (areaQueueSys - lastAreaQueueSys) / batchDuration;
                 double batchRho = sumUtil / TOTAL_NODES;
 
+                // Aggiunge batch-means alla struttura statistica
+                replicationStats.insert(batchETs, batchENs, batchETq, batchENq, batchRho);
+
                 // 9) Aggiorna cumulativi globali e salva
                 cumETs += batchETs;
                 cumENs += batchENs;
@@ -295,12 +295,6 @@ public class RideSharingSystem implements Sistema {
                         cumENq / batchCount,
                         cumRho / batchCount
                 );
-
-                etList.add(batchETs);
-                enList.add(batchENs);
-                etqList.add(batchETq);
-                enqList.add(batchENq);
-                rhoList.add(batchRho);
 
                 // 10) Statistiche per‑nodo cumulative
                 for (int i = 0; i < TOTAL_NODES; i++) {
@@ -319,7 +313,6 @@ public class RideSharingSystem implements Sistema {
                     double ENq_i = deltaAQ / batchDuration;
                     double rho_i = node.getUtilization();
 
-                    // accumula e calcola media cumulativa per il nodo i
                     cumETsNode[i] += ETs_i;
                     cumENsNode[i] += ENs_i;
                     cumETqNode[i] += ETq_i;
@@ -348,18 +341,12 @@ public class RideSharingSystem implements Sistema {
             }
         }
 
-        // 12) Stampa intervalli di confidenza globali
+        // 12) Stampa intervalli di confidenza globali (con ReplicationStats)
         System.out.println("=== Intervalli di confidenza (95%) ===");
-        systemStats.printConfidenceInterval("ETs",  etList);
-        systemStats.printConfidenceInterval("ENs",  enList);
-        systemStats.printConfidenceInterval("ETq",  etqList);
-        systemStats.printConfidenceInterval("ENq",  enqList);
-        systemStats.printConfidenceInterval("Rho",  rhoList);
+        replicationStats.printAllConfidenceIntervals(0.05);
 
         System.out.println("=== Infinite Simulation – Fine ===");
     }
-
-
 
     public void generateFeedback(MsqEvent event) {
         if (event.postiRichiesti < 4) {
@@ -373,5 +360,4 @@ public class RideSharingSystem implements Sistema {
             nodes.get(2).addNumber();
         }
     }
-    private final ReplicationStats systemStats = new ReplicationStats();
 }

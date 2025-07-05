@@ -131,7 +131,6 @@ public class SimpleSystem implements Sistema{
     public void runFiniteSimulation() {
         final double REPORT_INTERVAL = 50.0;
         final double WARMUP          = 200.0;    // elimina primo transient
-        final int    SYSTEM_INDEX    = -1;
 
         // Prepara il CSV globale (solo header, una volta)
         FileCSVGenerator.writeFiniteIntervalGlobalHeader();
@@ -171,7 +170,7 @@ public class SimpleSystem implements Sistema{
                 }
 
                 // **Caso REPORT**: prima del prossimo evento e prima di STOP
-                if (nextReportTime <= tmin && nextReportTime <= STOP) {
+                if (nextReportTime <= tmin) {
                     // 4.1) Integra tutti i nodi fino a nextReportTime
                     for (SimpleMultiserverNode n : localNodes) {
                         n.integrateTo(nextReportTime);
@@ -265,40 +264,31 @@ public class SimpleSystem implements Sistema{
 
         // 2) Prepara CSV globali e per‑nodo (header)
         FileCSVGenerator.writeInfiniteGlobal(0, 0, 0, 0, 0, 0);
-        // assume writeInfiniteLocal già esiste come descritto prima
 
-        // 3) Marker per delta batch globali e per‑nodo
-        double lastAreaSys      = 0.0;
-        double lastAreaQueueSys = 0.0;
-        long[]   lastProcessedJobs = new long[NODES];
-        double[] lastAreaNode      = new double[NODES];
+        // 3) Marker per delta batch
+        double lastAreaSys = 0.0, lastAreaQueueSys = 0.0;
+        long[] lastProcessedJobs = new long[NODES];
+        double[] lastAreaNode = new double[NODES];
         double[] lastAreaQueueNode = new double[NODES];
 
-        // 4) Cumulativi globali per medie cumulative
+        // 4–5) Cumulativi
         double cumETs = 0.0, cumENs = 0.0, cumETq = 0.0, cumENq = 0.0, cumRho = 0.0;
-        // 5) Cumulativi per‑nodo
         double[] cumETsNode = new double[NODES];
         double[] cumENsNode = new double[NODES];
         double[] cumETqNode = new double[NODES];
         double[] cumENqNode = new double[NODES];
         double[] cumRhoNode = new double[NODES];
 
-        int batchCount  = 0;
-        int jobsInBatch = 0;
+        // 👇 Nuovo oggetto per raccogliere i batch-means
+        ReplicationStats systemStats = new ReplicationStats();
+
+        int batchCount = 0, jobsInBatch = 0;
         double startTimeBatch = 0.0, endTimeBatch = 0.0;
 
-        // 6) Liste per intervalli di confidenza (globali)
-        List<Double> etList  = new ArrayList<>();
-        List<Double> enList  = new ArrayList<>();
-        List<Double> etqList = new ArrayList<>();
-        List<Double> enqList = new ArrayList<>();
-        List<Double> rhoList = new ArrayList<>();
-
-        // 7) Ciclo di simulazione
         while (batchCount < N_BATCHES) {
             // Trova il prossimo evento
             double tnext = Double.POSITIVE_INFINITY;
-            int    chosen = -1;
+            int chosen = -1;
             for (int i = 0; i < NODES; i++) {
                 double t = nodesLoc.get(i).peekNextEventTime();
                 if (t < tnext) {
@@ -307,12 +297,12 @@ public class SimpleSystem implements Sistema{
                 }
             }
 
-            // Integra TUTTI i nodi fino a tnext
+            // Integra tutti i nodi
             for (SimpleMultiserverNode node : nodesLoc) {
                 node.integrateTo(tnext);
             }
 
-            // Processa l’evento scelto
+            // Processa evento
             int srv = nodesLoc.get(chosen).processNextEvent(tnext);
             if (srv >= 0) {
                 if (jobsInBatch == 0) startTimeBatch = tnext;
@@ -320,25 +310,22 @@ public class SimpleSystem implements Sistema{
                 endTimeBatch = tnext;
             }
 
-            // Chiudi batch se completati BATCH_SIZE job
+            // Chiudi batch
             if (jobsInBatch >= BATCH_SIZE) {
                 batchCount++;
                 double batchDur = endTimeBatch - startTimeBatch;
 
-                // --- 8) Calcolo metriche GLOBALI per il batch ---
-                double areaSys       = 0.0;
-                double areaQueueSys  = 0.0;
-                int    jobsProcessed = 0;
-                double sumRhoGlobal  = 0.0;
+                // --- Calcolo metriche GLOBALI per batch ---
+                double areaSys = 0.0, areaQueueSys = 0.0, sumRhoGlobal = 0.0;
+                int jobsProcessed = 0;
 
-                // Calcola incrementali e usa getUtilization() per rho globale
                 for (int i = 0; i < NODES; i++) {
                     SimpleMultiserverNode node = nodesLoc.get(i);
-                    double area      = node.getArea();
-                    double areaQ     = node.getAreaQueue();
-                    long   procJobs  = node.getProcessedJobs();
+                    double area = node.getArea();
+                    double areaQ = node.getAreaQueue();
+                    long procJobs = node.getProcessedJobs();
 
-                    areaSys      += area;
+                    areaSys += area;
                     areaQueueSys += areaQ;
 
                     int deltaP = (int)(procJobs - lastProcessedJobs[i]);
@@ -347,17 +334,16 @@ public class SimpleSystem implements Sistema{
                     sumRhoGlobal += node.getUtilization();
                 }
 
-                double batchETs = jobsProcessed > 0
-                        ? (areaSys - lastAreaSys) / jobsProcessed
-                        : 0.0;
+                double batchETs = jobsProcessed > 0 ? (areaSys - lastAreaSys) / jobsProcessed : 0.0;
                 double batchENs = (areaSys - lastAreaSys) / batchDur;
-                double batchETq = jobsProcessed > 0
-                        ? (areaQueueSys - lastAreaQueueSys) / jobsProcessed
-                        : 0.0;
+                double batchETq = jobsProcessed > 0 ? (areaQueueSys - lastAreaQueueSys) / jobsProcessed : 0.0;
                 double batchENq = (areaQueueSys - lastAreaQueueSys) / batchDur;
-                double batchRho = sumRhoGlobal / NODES;  // media delle utilità
+                double batchRho = sumRhoGlobal / NODES;
 
-                // Aggiorna cumulativi globali e scrive media cumulativa
+                // 👇 Salva nel ReplicationStats
+                systemStats.insert(batchETs, batchENs, batchETq, batchENq, batchRho);
+
+                // Cumulativi globali
                 cumETs += batchETs;
                 cumENs += batchENs;
                 cumETq += batchETq;
@@ -373,32 +359,23 @@ public class SimpleSystem implements Sistema{
                         cumRho / batchCount
                 );
 
-                // Salva per intervalli di confidenza
-                etList.add(batchETs);
-                enList.add(batchENs);
-                etqList.add(batchETq);
-                enqList.add(batchENq);
-                rhoList.add(batchRho);
-
-                // --- 9) Statistiche cumulative PER NODO ---
+                // --- Calcolo metriche PER NODO ---
                 for (int i = 0; i < NODES; i++) {
                     SimpleMultiserverNode node = nodesLoc.get(i);
+                    double area = node.getArea();
+                    double areaQ = node.getAreaQueue();
+                    long procJobs = node.getProcessedJobs();
+                    double rho_i = node.getUtilization();
 
-                    double area      = node.getArea();
-                    double areaQ     = node.getAreaQueue();
-                    long   procJobs  = node.getProcessedJobs();
-                    double rho_i     = node.getUtilization();
-
-                    double deltaA   = area - lastAreaNode[i];
-                    double deltaAQ  = areaQ - lastAreaQueueNode[i];
-                    int    deltaPj  = (int)(procJobs - lastProcessedJobs[i]);
+                    double deltaA = area - lastAreaNode[i];
+                    double deltaAQ = areaQ - lastAreaQueueNode[i];
+                    int deltaPj = (int)(procJobs - lastProcessedJobs[i]);
 
                     double ETs_i = deltaPj > 0 ? deltaA / deltaPj : 0.0;
                     double ENs_i = deltaA / batchDur;
                     double ETq_i = deltaPj > 0 ? deltaAQ / deltaPj : 0.0;
                     double ENq_i = deltaAQ / batchDur;
 
-                    // Accumula e calcola media cumulativa per il nodo i
                     cumETsNode[i] += ETs_i;
                     cumENsNode[i] += ENs_i;
                     cumETqNode[i] += ETq_i;
@@ -406,8 +383,7 @@ public class SimpleSystem implements Sistema{
                     cumRhoNode[i] += rho_i;
 
                     FileCSVGenerator.writeInfiniteLocal(
-                            batchCount,
-                            i,
+                            batchCount, i,
                             cumETsNode[i] / batchCount,
                             cumENsNode[i] / batchCount,
                             cumETqNode[i] / batchCount,
@@ -415,31 +391,22 @@ public class SimpleSystem implements Sistema{
                             cumRhoNode[i] / batchCount
                     );
 
-                    // Aggiorna marker per il prossimo batch
-                    lastProcessedJobs[i]  = procJobs;
-                    lastAreaNode[i]       = area;
-                    lastAreaQueueNode[i]  = areaQ;
+                    lastProcessedJobs[i] = procJobs;
+                    lastAreaNode[i] = area;
+                    lastAreaQueueNode[i] = areaQ;
                 }
 
-                // --- 10) Reset marker globali e contatore batch ---
-                lastAreaSys      = areaSys;
+                lastAreaSys = areaSys;
                 lastAreaQueueSys = areaQueueSys;
-                jobsInBatch      = 0;
+                jobsInBatch = 0;
             }
         }
 
-        // 11) Stampa intervalli di confidenza globali
+        // --- Stampa finali: Intervalli di Confidenza 95%
         System.out.println("=== Intervalli di confidenza (95%) ===");
-        systemStats.printConfidenceInterval("ETs", etList);
-        systemStats.printConfidenceInterval("ENs", enList);
-        systemStats.printConfidenceInterval("ETq", etqList);
-        systemStats.printConfidenceInterval("ENq", enqList);
-        systemStats.printConfidenceInterval("Rho", rhoList);
-
+        systemStats.printAllConfidenceIntervals(0.05);
         System.out.println("=== Infinite Simulation – Fine ===");
     }
-
-
 
     @Override
     public void generateFeedback(MsqEvent event) {
