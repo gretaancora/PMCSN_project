@@ -24,11 +24,16 @@ public class Main {
         int simulationType = getChoice();
 
         switch (simulationType){
-            case 0 -> system.runFiniteSimulation();
-            case 1 -> system.runInfiniteSimulation();
+            case 0 -> {
+                assert system != null;
+                system.runFiniteSimulation();
+            }
+            case 1 -> {
+                assert system != null;
+                system.runInfiniteSimulation();
+            }
             default -> System.out.println("Invalid simulation choice!");
         }
-
     }
 
     private static int getChoice() {

@@ -132,6 +132,42 @@ public class FileCSVGenerator {
             e.printStackTrace();
         }
     }
+    /**
+     * Scrive le statistiche di batch-per-nodo per la simulazione infinita.
+     * Ogni file si chiama infinite_local_center<X>.csv e contiene:
+     * Batch,Center,ETs,ENs,ETq,ENq,Rho
+     */
+    public static void writeInfiniteLocal(
+            int batchNumber,
+            int centerIndex,
+            double eTs,
+            double eNs,
+            double eTq,
+            double eNq,
+            double rho
+    ) {
+        String fileName = RESULT + "infinite_local_center" + centerIndex + ".csv";
+        boolean newFile = ensureFile(fileName);
+
+        try (FileWriter fw = new FileWriter(fileName, true)) {
+            if (newFile) {
+                // header
+                fw.append("Batch,Center,ETs,ENs,ETq,ENq,Rho\n");
+            }
+            fw.append(String.join(",",
+                    String.valueOf(batchNumber),
+                    String.valueOf(centerIndex),
+                    String.format(Locale.US, "%.5f", eTs),
+                    String.format(Locale.US, "%.5f", eNs),
+                    String.format(Locale.US, "%.5f", eTq),
+                    String.format(Locale.US, "%.5f", eNq),
+                    String.format(Locale.US, "%.5f", rho)
+            ));
+            fw.append("\n");
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
 
 
 

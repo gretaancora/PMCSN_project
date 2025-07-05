@@ -19,9 +19,9 @@ public class RideSharingSystem implements Sistema {
     private static final double STOP = 10000.0;
     // Numero di server configurati per ciascun nodo semplice
     public static final Integer[] SERVERS_SIMPLE = {
-            23,
-            6,
-            6
+            27,
+            9,
+            9
     };
     private Rngs rng;
     private static final List<Node> nodes = new ArrayList<>(4);
@@ -48,6 +48,9 @@ public class RideSharingSystem implements Sistema {
     public void runFiniteSimulation() {
         final double REPORT_INTERVAL = 50.0;
         final int    SYSTEM_INDEX    = -1;
+        final double WARMUP = 200.0;                // elimina primo transient
+// NON scrivere nulla per t ≤ WARMUP
+
 
         for (int rep = 1; rep <= REPLICAS; rep++) {
             // 1) Inizializza RNG
@@ -58,23 +61,23 @@ public class RideSharingSystem implements Sistema {
             List<Node> localNodes = new ArrayList<>();
             for (int i = 0; i < SIMPLE_CENTERS; i++) {
                 SimpleMultiserverNode n = new SimpleMultiserverNode(this, i, SERVERS_SIMPLE[i], rng);
-                n.resetState();               // li inizializzo a zero
+                n.resetState();
                 localNodes.add(n);
             }
             for (int j = 0; j < RIDE_CENTERS; j++) {
                 RideSharingMultiserverNode n = new RideSharingMultiserverNode(rng, this);
-                n.resetState();               // li inizializzo a zero
+                n.resetState();
                 localNodes.add(n);
             }
 
             // 3) Prepara il reporting a intervalli
-            double nextReportTime   = REPORT_INTERVAL;
+            double nextReportTime = WARMUP + REPORT_INTERVAL;
 
             // 4) Loop eventi fino a STOP
             while (true) {
                 // trova il prossimo evento
                 double tmin = Double.POSITIVE_INFINITY;
-                int    idx  = 0;
+                int idx = 0;
                 for (int i = 0; i < localNodes.size(); i++) {
                     double t = localNodes.get(i).peekNextEventTime();
                     if (t < tmin) {
@@ -84,47 +87,70 @@ public class RideSharingSystem implements Sistema {
                 }
 
                 // se non ci sono più eventi e ho già superato STOP e l'ultimo report
-                if (tmin > STOP && nextReportTime > STOP) break;
+                if (tmin > STOP && nextReportTime > STOP) {
+                    break;
+                }
 
                 // caso report prima del prossimo evento
                 if (nextReportTime <= tmin && nextReportTime <= STOP) {
                     // integra tutti i nodi fino a nextReportTime
                     for (Node n : localNodes) {
-                        if (n instanceof SimpleMultiserverNode) {
-                            n.integrateTo(nextReportTime);
-                        } else {
-                            n.integrateTo(nextReportTime);
-                        }
+                        n.integrateTo(nextReportTime);
                     }
-                    // calcola cumulativi di sistema
+
+                    // --- Statistiche GLOBALI ---
                     double cumArea      = 0.0;
                     long   cumJobs      = 0;
                     double cumAreaQueue = 0.0;
-                    long   cumQJobs     = 0;
+                    /* long cumQJobs= 0; // non più usato per ETq */
                     for (Node n : localNodes) {
                         cumArea      += n.getArea();
                         cumJobs      += n.getProcessedJobs();
                         cumAreaQueue += n.getAreaQueue();
-                        cumQJobs     += n.getQueueJobs();
                     }
-                    double t = nextReportTime;
                     double cumETs = cumJobs > 0 ? cumArea / cumJobs : 0.0;
-                    double cumENs = cumArea / t;
-                    double cumETq = cumQJobs > 0 ? cumAreaQueue / cumQJobs : 0.0;
-                    double cumENq = cumAreaQueue / t;
-                    // rho medio dei nodi
-                    double cumRho = 0;
-                    for (Node n : localNodes) cumRho += n.getUtilization();
-                    cumRho /= localNodes.size();
+                    double cumENs = cumArea / nextReportTime;
+                    double cumETq = cumJobs > 0 ? cumAreaQueue / cumJobs : 0.0;
+                    double cumENq = cumAreaQueue / nextReportTime;
+                    double cumRho = localNodes.stream()
+                            .mapToDouble(Node::getUtilization)
+                            .average()
+                            .orElse(0.0);
 
+                    // scrivo la riga GLOBAL
                     FileCSVGenerator.writeIntervalData(
-                            true,
-                            rep,             // seed = numero di replica
-                            SYSTEM_INDEX,    // -1 per sistema global
-                            t,
+                            true,           // global flag
+                            rep,
+                            SYSTEM_INDEX,   // -1 per sistema globale
+                            nextReportTime,
                             cumETs, cumENs, cumETq, cumENq, cumRho
                     );
 
+                    // --- Statistiche per ciascun NODO ---
+                    for (int i = 0; i < localNodes.size(); i++) {
+                        Node n = localNodes.get(i);
+
+                        double area_i      = n.getArea();
+                        long   jobs_i      = n.getProcessedJobs();
+                        double areaQ_i     = n.getAreaQueue();
+                        //long   qJobs_i     = n.getQueueJobs(); // non usato per ETq
+                        double ETs_i       = jobs_i > 0 ? area_i / jobs_i : 0.0;
+                        double ENs_i       = area_i / nextReportTime;
+                        double ETq_i       = jobs_i > 0 ? areaQ_i / jobs_i : 0.0;
+                        double ENq_i       = areaQ_i / nextReportTime;
+                        double rho_i       = n.getUtilization();
+
+                        // scrivo la riga per il nodo i
+                        FileCSVGenerator.writeIntervalData(
+                                false,      // nodo-level flag
+                                rep,
+                                i,          // SYSTEM_INDEX = indice del nodo
+                                nextReportTime,
+                                ETs_i, ENs_i, ETq_i, ENq_i, rho_i
+                        );
+                    }
+
+                    // avanza il reporting
                     nextReportTime += REPORT_INTERVAL;
                     continue;
                 }
@@ -137,8 +163,8 @@ public class RideSharingSystem implements Sistema {
                 }
             }
 
-            // 5) statistiche finali di replica
-            double procSum = 0, respSum = 0;
+            // 5) statistiche finali di replica (globali)
+            double procSum = 0.0, respSum = 0.0;
             for (Node n : localNodes) {
                 procSum += n.getProcessedJobs();
                 respSum += n.getAvgResponse();
@@ -151,20 +177,24 @@ public class RideSharingSystem implements Sistema {
         }
     }
 
+
+
+
+
     @Override
     public void runInfiniteSimulation() {
-        final int BATCH_SIZE = 256;
-        final int N_BATCHES  = 64;
-        final int TOTAL_NODES = SIMPLE_CENTERS + RIDE_CENTERS;
+        final int BATCH_SIZE   = 256;
+        final int N_BATCHES    = 64;
+        final int TOTAL_NODES  = SIMPLE_CENTERS + RIDE_CENTERS;
 
-        System.out.println("=== RideSharingSystem (Infinite Simulation – Batch Means – Simple Style) ===");
+        System.out.println("=== RideSharingSystem (Infinite Simulation – Batch Means – Per‑Node Cumulative) ===");
         System.out.printf("Nodi: %d (simple=%d, ride=%d), Batch size: %d, #Batch totali: %d%n",
                 TOTAL_NODES, SIMPLE_CENTERS, RIDE_CENTERS, BATCH_SIZE, N_BATCHES);
 
-        // Prepara CSV (header)
+        // 1) CSV globale (medie cumulative)
         FileCSVGenerator.writeInfiniteGlobal(0, 0, 0, 0, 0, 0);
 
-        // Inizializza RNG e nodi
+        // 2) Inizializza RNG e nodi
         Rngs rng = new Rngs();
         rng.plantSeeds(1);
         List<Node> nodesLoc = new ArrayList<>(TOTAL_NODES);
@@ -175,32 +205,38 @@ public class RideSharingSystem implements Sistema {
             nodesLoc.add(new RideSharingMultiserverNode(rng, this));
         }
 
-        // Variabili cumulative globali
+        // 3) Marker per delta batch globali e per‑nodo
+        double lastAreaSys      = 0.0;
+        double lastAreaQueueSys = 0.0;
+        long[]   lastProcessedJobs = new long[TOTAL_NODES];
+        double[] lastAreaNode      = new double[TOTAL_NODES];
+        double[] lastAreaQueueNode = new double[TOTAL_NODES];
+
+        // 4) Cumulativi globali per medie
         double cumETs = 0.0, cumENs = 0.0, cumETq = 0.0, cumENq = 0.0, cumRho = 0.0;
 
-        // Marker per delta batch
-        long[]   lastProcessedJobs = new long[TOTAL_NODES];
-        long[]   lastQueueJobs     = new long[TOTAL_NODES];
-        double   lastAreaSys       = 0.0;
-        double   lastAreaQueueSys  = 0.0;
+        // 5) Cumulativi per‑nodo
+        double[] cumETsNode  = new double[TOTAL_NODES];
+        double[] cumENsNode  = new double[TOTAL_NODES];
+        double[] cumETqNode  = new double[TOTAL_NODES];
+        double[] cumENqNode  = new double[TOTAL_NODES];
+        double[] cumRhoNode  = new double[TOTAL_NODES];
 
-        int batchCount    = 0;
-        int completions   = 0;
+        int batchCount  = 0;
+        int completions = 0;
         double startBatch = 0.0, endBatch = 0.0;
 
-        /*aggiunte le liste per batch means */
-        // Liste per batch means
-        List<Double> etList = new ArrayList<>();
-        List<Double> enList = new ArrayList<>();
+        // 6) Liste per intervalli di confidenza globali
+        List<Double> etList  = new ArrayList<>();
+        List<Double> enList  = new ArrayList<>();
         List<Double> etqList = new ArrayList<>();
         List<Double> enqList = new ArrayList<>();
         List<Double> rhoList = new ArrayList<>();
-        /*aggiunte le liste per batch means */
 
+        // 7) Ciclo di simulazione a batch
         while (batchCount < N_BATCHES) {
-            // Trova prossimo evento
             double tnext = Double.POSITIVE_INFINITY;
-            Node   chosen = null;
+            Node chosen = null;
             for (Node n : nodesLoc) {
                 double t = n.peekNextEventTime();
                 if (t < tnext) {
@@ -208,91 +244,53 @@ public class RideSharingSystem implements Sistema {
                     chosen = n;
                 }
             }
+            for (Node n : nodesLoc) n.integrateTo(tnext);
 
-            // Integra tutti i nodi fino a tnext
-            for (Node n : nodesLoc) {
-                n.integrateTo(tnext);
-            }
-
-            // Processa l’evento
-            assert chosen != null;
-            int srv = chosen.processNextEvent(tnext);
-            if (srv >= 0) {
-                if (completions == 0) {
-                    startBatch = tnext;
-                }
+            if (chosen.processNextEvent(tnext) >= 0) {
+                if (completions == 0) startBatch = tnext;
                 completions++;
                 endBatch = tnext;
             }
 
-            // Chiudi batch
             if (completions >= BATCH_SIZE) {
                 batchCount++;
+                double batchDuration = endBatch - startBatch;
 
-                // Calcolo area e job cumulati
-                double areaSys      = 0.0;
-                double areaQueueSys = 0.0;
-                long   totalJobs    = 0;
-                long   totalQueueJobs = 0;
+                // 8) Calcolo metriche globali batch
+                double areaSys       = 0.0;
+                double areaQueueSys  = 0.0;
                 int    batchJobsProcessed = 0;
+                double sumUtil       = 0.0;
 
                 for (int i = 0; i < TOTAL_NODES; i++) {
                     Node node = nodesLoc.get(i);
-                    double a   = node.getArea();
-                    double aq  = node.getAreaQueue();
-                    long  pj   = node.getProcessedJobs();
-                    long  qj   = node.getQueueJobs();
+                    double a    = node.getArea();
+                    double aq   = node.getAreaQueue();
+                    long   pj   = node.getProcessedJobs();
 
-                    areaSys        += a;
-                    areaQueueSys   += aq;
-                    totalJobs      += pj;
-                    totalQueueJobs += qj;
-
-                    int deltaProcessed = (int)(pj - lastProcessedJobs[i]);
-                    batchJobsProcessed += deltaProcessed;
-
-                    lastProcessedJobs[i] = pj;
-                    lastQueueJobs[i]     = qj;
+                    areaSys      += a;
+                    areaQueueSys += aq;
+                    batchJobsProcessed += (int)(pj - lastProcessedJobs[i]);
+                    sumUtil       += node.getUtilization();
                 }
 
-                // Metriche di batch
                 double batchETs = batchJobsProcessed > 0
                         ? (areaSys - lastAreaSys) / batchJobsProcessed
                         : 0.0;
-                double batchENs = (areaSys - lastAreaSys) / (endBatch - startBatch);
-                long   queueJobsDelta = totalQueueJobs - Arrays.stream(lastQueueJobs).sum();
-                double batchETq = queueJobsDelta > 0
-                        ? (areaQueueSys - lastAreaQueueSys) / queueJobsDelta
+                double batchENs = (areaSys - lastAreaSys) / batchDuration;
+                double batchETq = batchJobsProcessed > 0
+                        ? (areaQueueSys - lastAreaQueueSys) / batchJobsProcessed
                         : 0.0;
-                double batchENq = (areaQueueSys - lastAreaQueueSys) / (endBatch - startBatch);
+                double batchENq = (areaQueueSys - lastAreaQueueSys) / batchDuration;
+                double batchRho = sumUtil / TOTAL_NODES;
 
-                // Rho di batch
-                double servInc = 0.0;
-                for (Node n : nodesLoc) {
-                    servInc += n.getIncrementalServiceTime();
-                }
-                int totalServers = Arrays.stream(SERVERS_SIMPLE).mapToInt(x -> x).sum()
-                        + RIDE_CENTERS * RideSharingMultiserverNode.getNumServersPerRide();
-                double batchRho = (servInc / (endBatch - startBatch)) / totalServers;
-
-                // Inserimento batch e aggiornamento cumulativi
-                systemStats.insert(batchETs, batchENs, batchETq, batchENq, batchRho);
+                // 9) Aggiorna cumulativi globali e salva
                 cumETs += batchETs;
                 cumENs += batchENs;
                 cumETq += batchETq;
                 cumENq += batchENq;
                 cumRho += batchRho;
 
-                /*aggiunte le liste per batch means */
-                // Salva il batch
-                etList.add(batchETs);
-                enList.add(batchENs);
-                etqList.add(batchETq);
-                enqList.add(batchENq);
-                rhoList.add(batchRho);
-                /*aggiunte le liste per batch means */
-
-                // Scrittura medias globali su CSV
                 FileCSVGenerator.writeInfiniteGlobal(
                         batchCount,
                         cumETs / batchCount,
@@ -302,24 +300,69 @@ public class RideSharingSystem implements Sistema {
                         cumRho / batchCount
                 );
 
-                // Reset marker per batch successivo
+                etList.add(batchETs);
+                enList.add(batchENs);
+                etqList.add(batchETq);
+                enqList.add(batchENq);
+                rhoList.add(batchRho);
+
+                // 10) Statistiche per‑nodo cumulative
+                for (int i = 0; i < TOTAL_NODES; i++) {
+                    Node node = nodesLoc.get(i);
+                    long pj     = node.getProcessedJobs();
+                    double a    = node.getArea();
+                    double aq   = node.getAreaQueue();
+
+                    double deltaA  = a  - lastAreaNode[i];
+                    double deltaAQ = aq - lastAreaQueueNode[i];
+                    int    deltaPj = (int)(pj - lastProcessedJobs[i]);
+
+                    double ETs_i = deltaPj > 0 ? deltaA / deltaPj : 0.0;
+                    double ENs_i = deltaA / batchDuration;
+                    double ETq_i = deltaPj > 0 ? deltaAQ / deltaPj : 0.0;
+                    double ENq_i = deltaAQ / batchDuration;
+                    double rho_i = node.getUtilization();
+
+                    // accumula e calcola media cumulativa per il nodo i
+                    cumETsNode[i] += ETs_i;
+                    cumENsNode[i] += ENs_i;
+                    cumETqNode[i] += ETq_i;
+                    cumENqNode[i] += ENq_i;
+                    cumRhoNode[i] += rho_i;
+
+                    FileCSVGenerator.writeInfiniteLocal(
+                            batchCount,
+                            i,
+                            cumETsNode[i] / batchCount,
+                            cumENsNode[i] / batchCount,
+                            cumETqNode[i] / batchCount,
+                            cumENqNode[i] / batchCount,
+                            cumRhoNode[i] / batchCount
+                    );
+
+                    lastProcessedJobs[i]   = pj;
+                    lastAreaNode[i]        = a;
+                    lastAreaQueueNode[i]   = aq;
+                }
+
+                // 11) Aggiorna marker globali e resetta contatore
                 lastAreaSys      = areaSys;
                 lastAreaQueueSys = areaQueueSys;
                 completions      = 0;
             }
         }
 
-        /*aggiunte le liste per batch means */
-        // Calcola e stampa intervalli di confidenza
+        // 12) Stampa intervalli di confidenza globali
         System.out.println("=== Intervalli di confidenza (95%) ===");
-        systemStats.printConfidenceInterval("ETs", etList);
-        systemStats.printConfidenceInterval("ENs", enList);
-        systemStats.printConfidenceInterval("ETq", etqList);
-        systemStats.printConfidenceInterval("ENq", enqList);
-        systemStats.printConfidenceInterval("Rho", rhoList);
-        /*aggiunte le liste per batch means */
+        systemStats.printConfidenceInterval("ETs",  etList);
+        systemStats.printConfidenceInterval("ENs",  enList);
+        systemStats.printConfidenceInterval("ETq",  etqList);
+        systemStats.printConfidenceInterval("ENq",  enqList);
+        systemStats.printConfidenceInterval("Rho",  rhoList);
+
         System.out.println("=== Infinite Simulation – Fine ===");
     }
+
 
 
     public void generateFeedback(MsqEvent event) {

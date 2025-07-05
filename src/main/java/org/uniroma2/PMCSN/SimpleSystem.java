@@ -62,6 +62,12 @@ public class SimpleSystem implements Sistema{
                         double cumENs = cumArea  / t;
                         double cumETq = cumQJobs > 0 ? cumQArea / cumQJobs : 0.0;
                         double cumENq = cumQArea / t;
+
+                        /*aggiunta area service*/
+                        double cumES = cumJobs > 0 ? cumAreaService / cumJobs : 0.0;
+                        double cumENS = cumAreaService / t;
+                        /*aggiunta area service*/
+
                         double cumRho = node.getUtilization();
 
                         // 3) scrivi SOLO cumulative
@@ -82,7 +88,6 @@ public class SimpleSystem implements Sistema{
                         nextReportTime += 50.0;  // o 200.0 come preferisci
                     }
 
-
                     else if (tnext <= STOP) {
                         node.processNextEvent(tnext);
 
@@ -92,8 +97,6 @@ public class SimpleSystem implements Sistema{
                         break;
                     }
                 }
-
-
 
                 // raccolta stats nodo
                 node.collectStatistics(rep);
@@ -119,7 +122,6 @@ public class SimpleSystem implements Sistema{
 
     }
 
-
     @Override
     public void runInfiniteSimulation() {
         final int BATCH_SIZE = 256;
@@ -144,8 +146,10 @@ public class SimpleSystem implements Sistema{
         double   lastAreaQueueSys  = 0.0;
 
         int batchCount  = 0;
-        int jobsInBatch = 0;
-        double startTimeBatch = 0.0, endTimeBatch = 0.0;
+        int jobsInBatch;
+        jobsInBatch = 0;
+        double startTimeBatch = 0.0;
+        double endTimeBatch = 0.0;
 
         /*aggiunte le liste per batch means */
         // Liste per batch means
@@ -257,8 +261,6 @@ public class SimpleSystem implements Sistema{
                 jobsInBatch      = 0;
             }
         }
-
-        System.out.println("=== Intervalli di confidenza (95%) ===");
 
         systemStats.printConfidenceInterval("ETs", etList);
         systemStats.printConfidenceInterval("ENs", enList);

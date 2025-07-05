@@ -23,16 +23,16 @@ public class RideSharingMultiserverNode implements Node{
     private double lastTotalService;
     private long queueJobs = 0;      // numero totale di job che hanno fatto coda
     private static final List<MsqEvent> pendingArrivals = new ArrayList<MsqEvent>();
-    /*Costants*/
+    /*Constants*/
     private static final int ARRIVAL = 0;
-    private static final int SERVERS = 20;
+    private static final int SERVERS = 10;
     private static final double P_EXIT = 0.2;
     private static final double FEEDBACK = 0.4;
     private static final double DELAY = 10;
     private static final double TIME_WINDOW = 5;
-    private static final int SERVER_SMALL = 10;
-    private static final int SERVER_MEDIUM = 5;
-    private static final int SERVER_LARGE = 5;
+    private static final int SERVER_SMALL = 6;
+    private static final int SERVER_MEDIUM = 2;
+    private static final int SERVER_LARGE = 2;
     private static final double P_MATCH_BUSY = 0.6;
     private static final double P_MATCH_IDLE = 0.6;
 
@@ -189,8 +189,11 @@ public class RideSharingMultiserverNode implements Node{
         int e = peekNextEventType();
         clock.next = event[e].t;
 
+        // integrazione aree
+        double dt = clock.next - clock.current;
         // integrazione area
-        area += (clock.next - clock.current) * number;
+        area += dt * number;
+
         clock.current = clock.next;
         //System.out.println(e);
         if (e == ARRIVAL) {
@@ -266,7 +269,7 @@ public class RideSharingMultiserverNode implements Node{
 
     public double getNextArrivalTime() {
         r.selectStream(0);
-        double lambda = 1.65 * 0.3;
+        double lambda = 2.25 * 0.3;
         sarrival += exponential(1/lambda, r);
         return sarrival;
     }
@@ -278,15 +281,15 @@ public class RideSharingMultiserverNode implements Node{
         //return uniform(2.0, 10.0, r);
         double alpha;
         double beta;
-        double a = 1;
+        double a = 2;
         double b = 60;
 
-        alpha = cdfNormal(20.0, 2.0, a);
-        beta = cdfNormal(20.0, 2.0, b);
+        alpha = cdfNormal(20.0, 10.0, a);
+        beta = cdfNormal(20.0, 10.0, b);
 
         double u = uniform(alpha, beta, r);
         //System.out.println("Servizio: " + idfNormal(30, 2.0, u)+DELAY);
-        return (idfNormal(20.0, 2.0, u)+DELAY);
+        return (idfNormal(20.0, 10.0, u)+DELAY);
     }
 
 
@@ -311,14 +314,8 @@ public class RideSharingMultiserverNode implements Node{
 
 
     // Metodi per statistiche a fine run
-    public double getAvgInterArrival() {
-        return event[ARRIVAL].t / index;
-    }
 
     public double getAvgResponse() {
-        //  System.out.println(area);
-        //  System.out.println(index);
-        //  System.out.println(area/index);
         return area / index;
     }
 
@@ -407,11 +404,12 @@ public class RideSharingMultiserverNode implements Node{
             s.service = 0.0;
             s.served  = 0;
         }
-        // rischedula primo arrivo
+        // schedule primo arrivo
         event[ARRIVAL].t = getNextArrivalTime();
         event[ARRIVAL].x = 1;
         event[ARRIVAL].postiRichiesti = getNumPosti();
         // svuota la coda pendente
         pendingArrivals.clear();
     }
+
 }
