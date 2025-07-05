@@ -31,15 +31,6 @@ public class SimpleMultiserverNode implements Node{
     private final ReplicationStats stats = new ReplicationStats();
     private double lastTotalService;
 
-
-    // Marker per snapshot a intervalli
-    private double lastAreaSnapshot      = 0.0;
-    private long   lastProcessedSnapshot = 0;
-    private double lastQueueAreaSnapshot = 0.0;
-    private long   lastQueueJobsSnapshot = 0;
-
-
-
     public SimpleMultiserverNode(Sistema system, int index, int servers, Rngs rng) {
         this.SERVERS = servers;
         this.r = rng;
@@ -68,8 +59,8 @@ public class SimpleMultiserverNode implements Node{
         }
 
         // schedulo il primo arrivo “esterno”
-        event.get(ARRIVAL).t = getNextArrivalTime();
-        event.get(ARRIVAL).x = 1;
+        event.getFirst().t = getNextArrivalTime();
+        event.getFirst().x = 1;
     }
 
     // Espone il prossimo evento attivo
